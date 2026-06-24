@@ -58,6 +58,7 @@ dynamic = ["optional-dependencies"]
 [project.entry-points."holosoma.bridge"]
 unitree = "holosoma.bridge.unitree:UnitreeSdk2Bridge"
 booster = "holosoma.bridge.booster:BoosterSdk2Bridge"
+zmq = "holosoma.bridge.zmq:ZmqBridge"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -83,15 +83,18 @@ setup(
             "unitree = holosoma_inference.sdk.unitree.unitree_interface:UnitreeInterface",
             "unitree_mp = holosoma_inference.sdk.unitree.unitree_interface_mp:UnitreeInterfaceMP",
             "booster = holosoma_inference.sdk.booster.booster_interface:BoosterInterface",
+            "zmq = holosoma_inference.sdk.zmq.zmq_interface:ZmqInterface",
         ],
         "holosoma.config.robot": [
             "g1-29dof = holosoma_inference.config.config_values.robot:g1_29dof",
             "t1-29dof = holosoma_inference.config.config_values.robot:t1_29dof",
+            "statue-28dof = holosoma_inference.config.config_values.robot:statue_28dof",
         ],
         "holosoma.config.inference": [
             "g1-29dof-loco = holosoma_inference.config.config_values.inference:g1_29dof_loco",
             "t1-29dof-loco = holosoma_inference.config.config_values.inference:t1_29dof_loco",
             "g1-29dof-wbt = holosoma_inference.config.config_values.inference:g1_29dof_wbt",
+            "statue-28dof-loco = holosoma_inference.config.config_values.inference:statue_28dof_loco",
         ],
     },
     keywords="humanoid robotics inference policy onnx",

@@ -223,6 +223,145 @@ t1_29dof = RobotConfig(
 
 
 # =============================================================================
+# Statue 28-DOF Robot Config
+# =============================================================================
+
+# fmt: off
+statue_28dof = RobotConfig(
+    # Identity
+    robot_type="statue_28dof",
+    robot="statue",
+
+    # SDK Configuration — ZMQ bridge for sim2sim (no hardware DDS SDK)
+    sdk_type="zmq",
+    motor_type="serial",
+    message_type="HG",
+    use_sensor=False,
+
+    # Dimensions
+    num_motors=28,
+    num_joints=28,
+    num_upper_body_joints=14,
+
+    # Default joint angles — taken from training default_joint_angles,
+    # ordered to match training dof_names exactly.
+    default_dof_angles=(
+        -0.312, 0.0, 0.0, 0.669, -0.363, 0.0,   # left leg:  hip_pitch, hip_roll, hip_yaw, knee_pitch, ankle_pitch, ankle_roll
+        -0.312, 0.0, 0.0, 0.669, -0.363, 0.0,   # right leg: hip_pitch, hip_roll, hip_yaw, knee_pitch, ankle_pitch, ankle_roll
+        0.0, 0.0,                                  # waist: yaw, pitch
+        0.2, 0.2, 0.0, 0.6, 0.0, 0.0, 0.0,       # left arm:  shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_yaw, wrist_pitch
+        0.2, -0.2, 0.0, 0.6, 0.0, 0.0, 0.0,      # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_yaw, wrist_pitch
+    ),
+    default_motor_angles=(
+        -0.312, 0.0, 0.0, 0.669, -0.363, 0.0,
+        -0.312, 0.0, 0.0, 0.669, -0.363, 0.0,
+        0.0, 0.0,
+        0.2, 0.2, 0.0, 0.6, 0.0, 0.0, 0.0,
+        0.2, -0.2, 0.0, 0.6, 0.0, 0.0, 0.0,
+    ),
+
+    # Identity mapping — motors and joints share the same index space
+    motor2joint=tuple(range(28)),
+    joint2motor=tuple(range(28)),
+
+    # Joint names — must match training dof_names order exactly
+    dof_names=(
+        "left_hip_pitch_joint",
+        "left_hip_roll_joint",
+        "left_hip_yaw_joint",
+        "left_knee_pitch_joint",
+        "left_ankle_pitch_joint",
+        "left_ankle_roll_joint",
+        "right_hip_pitch_joint",
+        "right_hip_roll_joint",
+        "right_hip_yaw_joint",
+        "right_knee_pitch_joint",
+        "right_ankle_pitch_joint",
+        "right_ankle_roll_joint",
+        "waist_yaw_joint",
+        "waist_pitch_joint",
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_pitch_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_yaw_joint",
+        "left_wrist_pitch_joint",
+        "right_shoulder_pitch_joint",
+        "right_shoulder_roll_joint",
+        "right_shoulder_yaw_joint",
+        "right_elbow_pitch_joint",
+        "right_wrist_roll_joint",
+        "right_wrist_yaw_joint",
+        "right_wrist_pitch_joint",
+    ),
+
+    # Upper body = arms only (waist is grouped with lower body, matching G1/T1 inference convention)
+    dof_names_upper_body=(
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_pitch_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_yaw_joint",
+        "left_wrist_pitch_joint",
+        "right_shoulder_pitch_joint",
+        "right_shoulder_roll_joint",
+        "right_shoulder_yaw_joint",
+        "right_elbow_pitch_joint",
+        "right_wrist_roll_joint",
+        "right_wrist_yaw_joint",
+        "right_wrist_pitch_joint",
+    ),
+
+    # Lower body = legs + waist (matching G1/T1 inference convention)
+    dof_names_lower_body=(
+        "left_hip_pitch_joint",
+        "left_hip_roll_joint",
+        "left_hip_yaw_joint",
+        "left_knee_pitch_joint",
+        "left_ankle_pitch_joint",
+        "left_ankle_roll_joint",
+        "right_hip_pitch_joint",
+        "right_hip_roll_joint",
+        "right_hip_yaw_joint",
+        "right_knee_pitch_joint",
+        "right_ankle_pitch_joint",
+        "right_ankle_roll_joint",
+        "waist_yaw_joint",
+        "waist_pitch_joint",
+    ),
+
+    # PD gains — taken from training stiffness/damping, in dof_names order
+    motor_kp=(
+        100.0, 250.0, 100.0, 250.0, 70.0, 70.0,   # left leg
+        100.0, 250.0, 100.0, 250.0, 70.0, 70.0,   # right leg
+        100.0, 80.0,                                # waist: yaw, pitch
+        20.0, 20.0, 20.0, 20.0, 20.0, 25.0, 25.0, # left arm
+        20.0, 20.0, 20.0, 20.0, 20.0, 25.0, 25.0, # right arm
+    ),
+    motor_kd=(
+        6.0, 16.0, 6.0, 16.0, 5.0, 5.0,           # left leg
+        6.0, 16.0, 6.0, 16.0, 5.0, 5.0,           # right leg
+        6.0, 5.0,                                   # waist: yaw, pitch
+        1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,        # left arm
+        1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,        # right arm
+    ),
+
+    # Link names
+    torso_link_name="waist_pitch_link",
+    left_hand_link_name=None,
+    right_hand_link_name=None,
+
+    # No Unitree/Booster-specific constants
+    unitree_legged_const=None,
+    weak_motor_joint_index=None,
+    motion=None,
+)
+# fmt: on
+
+
+# =============================================================================
 # Default Configurations Dictionary
 # =============================================================================
 
@@ -230,6 +369,7 @@ t1_29dof = RobotConfig(
 DEFAULTS = {
     "g1-29dof": g1_29dof,
     "t1-29dof": t1_29dof,
+    "statue-28dof": statue_28dof,
 }
 """Dictionary of all available robot configurations.
 

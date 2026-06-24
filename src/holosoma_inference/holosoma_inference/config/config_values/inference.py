@@ -31,6 +31,12 @@ t1_29dof_loco = InferenceConfig(
     task=task.locomotion,
 )
 
+statue_28dof_loco = InferenceConfig(
+    robot=robot.statue_28dof,
+    observation=observation.loco_statue_28dof,
+    task=task.locomotion,
+)
+
 # fmt: off
 _g1_29dof_wbt_robot = replace(
     robot.g1_29dof,
@@ -70,6 +76,7 @@ DEFAULTS = {
     "g1-29dof-loco": g1_29dof_loco,
     "t1-29dof-loco": t1_29dof_loco,
     "g1-29dof-wbt": g1_29dof_wbt,
+    "statue-28dof-loco": statue_28dof_loco,
 }
 
 # Track whether extensions have been loaded
