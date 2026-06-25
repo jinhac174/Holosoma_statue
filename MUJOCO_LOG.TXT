@@ -1,0 +1,22 @@
+ERROR Thu Jun 25 13:28:36 2026: could not initialize GLFW
+
+ERROR Thu Jun 25 13:32:42 2026: could not create window
+
+ERROR Thu Jun 25 13:36:00 2026: could not create window
+
+ERROR Thu Jun 25 13:44:56 2026: could not create window
+
+ERROR Thu Jun 25 13:47:05 2026: could not create window
+
+ERROR Thu Jun 25 13:52:55 2026: could not create window
+
+ERROR Thu Jun 25 13:54:26 2026: could not create window
+
+ERROR Thu Jun 25 13:57:25 2026: could not create window
+
+ERROR Thu Jun 25 14:00:43 2026: could not create window
+
+ERROR Thu Jun 25 14:01:29 2026: could not create window
+
+ERROR Thu Jun 25 14:02:52 2026: could not create window
+
