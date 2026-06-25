@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic.dataclasses import dataclass
 
-InputSource = Literal["keyboard", "interface", "joystick", "ros2"]
+InputSource = Literal["keyboard", "interface", "joystick", "ros2", "scripted"]
 
 DEFAULT_VELOCITY_INPUT: InputSource = "keyboard"
 DEFAULT_STATE_INPUT: InputSource = "keyboard"
@@ -98,8 +98,26 @@ class TaskConfig:
     ros_vel_timeout: float = 1.0
     """Seconds without a velocity message before zeroing commands. Set to 0 to disable."""
 
+    auto_start: bool = False
+    """Start the policy immediately without waiting for the ``]`` key press.
+
+    Useful for sim2sim workflows where the user wants the policy active on launch.
+    """
+
     auto_walk_on_vel_cmd: bool = False
     """Automatically enter walking mode when a non-zero velocity command is received."""
+
+    scripted_vx_range: tuple[float, float] = (0.3, 0.8)
+    """[scripted mode] Forward velocity range (m/s) to sample from."""
+
+    scripted_vy_range: tuple[float, float] = (-0.3, 0.3)
+    """[scripted mode] Lateral velocity range (m/s) to sample from."""
+
+    scripted_vyaw_range: tuple[float, float] = (-0.5, 0.5)
+    """[scripted mode] Yaw rate range (rad/s) to sample from."""
+
+    scripted_command_interval: float = 10.0
+    """[scripted mode] Seconds between random velocity resamples."""
 
     use_sim_time: bool = False
     """Use synchronized simulation time for WBT policies."""

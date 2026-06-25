@@ -197,10 +197,11 @@ class MujocoSceneManager:
             pos=[0, 0, 0],
             material="grid",
             friction=[
-                # Ignore terrain config until we expose Mujoco-specific parameters
-                0.7,  # reasonable default
-                0.005,  # reasonable default
-                0.001,  # reasonable default
+                # Training terrain default static_friction=1.0, DR range [0.5, 1.25].
+                # Use 1.0 to match training terrain default (previous 0.7 was too slippery).
+                1.0,   # sliding friction
+                0.005, # torsional
+                0.001, # rolling
             ],  # [sliding, torsional, rolling]
             solimp=[0.99, 0.99, 0.01, 0.5, 2],  # 5 elements: [dmin, dmax, width, midpoint, power]
             solref=[0.001, 1],  # 2 elements: [timeconst, dampratio]
@@ -230,10 +231,9 @@ class MujocoSceneManager:
             pos=[0.0, 0.0, 0.0],
             material="solid_gray",
             friction=[
-                # Ignore terrain config until we expose Mujoco-specific parameters
-                0.7,  # reasonable default
-                0.005,  # reasonable default
-                0.001,  # reasonable default
+                1.0,   # sliding friction — matches training terrain default
+                0.005, # torsional
+                0.001, # rolling
             ],  # [sliding, torsional, rolling]
             solimp=[0.99, 0.99, 0.01, 0.5, 2],
             solref=[0.001, 1],
@@ -305,10 +305,9 @@ class MujocoSceneManager:
                 z_offset if z_offset < 0 else 0.0,
             ],
             friction=[
-                # Ignore terrain config until we expose Mujoco-specific parameters
-                0.7,  # reasonable default
-                0.005,  # reasonable default
-                0.001,  # reasonable default
+                1.0,   # sliding friction — matches training terrain default
+                0.005, # torsional
+                0.001, # rolling
             ],  # [sliding, torsional, rolling]
             solimp=[0.99, 0.99, 0.01, 0.5, 2],
             solref=[0.001, 1],

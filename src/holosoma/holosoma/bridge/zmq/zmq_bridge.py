@@ -35,13 +35,30 @@ class ZmqBridge(BasicSdk2Bridge):
         except zmq.Again:
             pass
 
+    @staticmethod
+    def _world_to_body_angvel(quat_wxyz: np.ndarray, ang_vel_world: np.ndarray) -> np.ndarray:
+        """Rotate angular velocity from world frame to body frame.
+
+        MuJoCo's freejoint qvel[3:6] is in world frame; the policy expects body frame
+        (matching what a physical IMU on the robot would measure).
+        """
+        q_w = quat_wxyz[0]
+        q_xyz = quat_wxyz[1:]
+        v = ang_vel_world
+        a = v * (2.0 * q_w**2 - 1.0)
+        b = np.cross(q_xyz, v) * (q_w * 2.0)
+        c = q_xyz * (np.dot(q_xyz, v) * 2.0)
+        return (a - b + c).astype(np.float32)
+
     def publish_low_state(self):
         positions, velocities, _ = self._get_dof_states()
         quaternion, gyro, _ = self._get_base_imu_data()
 
         # quaternion is already [w, x, y, z] (converted in base class)
         quat_np = quaternion.detach().cpu().numpy().astype(np.float32)
-        omega_np = gyro.detach().cpu().numpy().astype(np.float32)
+        # gyro from MuJoCo freejoint qvel is in world frame; rotate to body frame so it
+        # matches what the policy saw during training (IMU = body-frame angular velocity).
+        omega_np = self._world_to_body_angvel(quat_np, gyro.detach().cpu().numpy())
         pos_np = positions.astype(np.float32)
         vel_np = velocities.astype(np.float32)
 

@@ -193,9 +193,13 @@ class VideoRecorderInterface(ABC):
         # Increment frame counter for decimation tracking
         self._frame_counter += 1
 
-        # Only capture frame at control frequency (every control_decimation physics steps)
-        control_decimation = self.simulator.simulator_config.sim.control_decimation
-        if self._frame_counter % control_decimation != 0:
+        # Capture at output_fps rate (or control frequency if output_fps not set)
+        sim_config = self.simulator.simulator_config.sim
+        if self.config.output_fps > 0:
+            capture_step = max(1, round(sim_config.fps / self.config.output_fps))
+        else:
+            capture_step = sim_config.control_decimation
+        if self._frame_counter % capture_step != 0:
             return
 
         if self.config.use_recording_thread:
@@ -433,6 +437,10 @@ class VideoRecorderInterface(ABC):
             sim_config = self.simulator.simulator_config.sim
             control_frequency = sim_config.fps / sim_config.control_decimation
             display_fps = control_frequency * self.config.playback_rate
+
+            # Use output_fps directly — frames were already captured at this rate
+            if self.config.output_fps > 0:
+                display_fps = self.config.output_fps
 
             # Get save directory
             save_dir = self._get_save_directory()

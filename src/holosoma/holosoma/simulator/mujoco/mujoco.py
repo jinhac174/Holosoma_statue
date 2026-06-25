@@ -363,6 +363,17 @@ class MuJoCo(BaseSimulator):
             cfg=gantry_cfg,
         )
 
+        # Set gantry rest length so it holds the robot at spawn height (not pulls it up to the anchor).
+        # With length=0, the spring drags the pelvis to z=height; setting length=height-spawn_z gives zero
+        # spring force at the initial position, acting as a neutral safety net.
+        if self.virtual_gantry and self.robot_config:
+            robot_init_z = self.robot_config.init_state.pos[2]
+            self._initial_gantry_length = gantry_cfg.height - robot_init_z
+            self.virtual_gantry.length = self._initial_gantry_length
+            logger.info(f"Gantry initial length = {self._initial_gantry_length:.3f}m (holds pelvis at z={robot_init_z:.3f}m)")
+
+        self._pending_reset = False
+
         # Initialize bridge system using base class helper
         self._init_bridge()
 
@@ -889,8 +900,33 @@ class MuJoCo(BaseSimulator):
         if self.virtual_gantry:
             self.virtual_gantry.draw_debug()
 
+    def _do_reset(self) -> None:
+        """Reset simulation to initial state with correct robot position and gantry."""
+        mujoco.mj_resetData(self.root_model, self.root_data)
+        self._set_robot_initial_state()
+
+        # Quietly reapply default joint angles
+        for joint_name, angle in self.robot_config.init_state.default_joint_angles.items():
+            mujoco_joint_name = self._get_prefixed_name(joint_name)
+            for i in range(self.root_model.njnt):
+                if self.root_model.joint(i).name == mujoco_joint_name:
+                    self.root_data.qpos[self.root_model.jnt_qposadr[i]] = angle
+                    break
+
+        # Reset gantry length to initial value
+        if self.virtual_gantry and hasattr(self, "_initial_gantry_length"):
+            self.virtual_gantry.length = self._initial_gantry_length
+
+        mujoco.mj_forward(self.root_model, self.root_data)
+        logger.info("Simulation reset to initial state")
+
     def simulate_at_each_physics_step(self) -> None:
         """Advance simulation by one step."""
+
+        if getattr(self, "_pending_reset", False):
+            self._pending_reset = False
+            self._do_reset()
+            return
 
         if self.virtual_gantry:
             # Apply virtual gantry forces before step
@@ -1313,6 +1349,13 @@ class MuJoCo(BaseSimulator):
             self.viewer = None
             return
 
+        # Enable X11 thread safety and use EGL context (works with XQuartz/remote displays).
+        # EGL with llvmpipe software rendering avoids the GLX + XQuartz incompatibility.
+        import ctypes, glfw
+        ctypes.CDLL("libX11.so.6").XInitThreads()
+        glfw.init()
+        glfw.window_hint(glfw.CONTEXT_CREATION_API, glfw.EGL_CONTEXT_API)
+
         self.viewer = mujoco.viewer.launch_passive(self.root_model, self.root_data, key_callback=self._key_callback)
         logger.info("=== Viewer setup completed with keyboard callback ===")
 
@@ -1357,7 +1400,6 @@ class MuJoCo(BaseSimulator):
             Whether to synchronize frame time (currently unused).
         """
         if self.viewer is None:
-            logger.warning("Cannot render, no viewer")
             return
 
         # Sync GPU -> CPU for WarpBackend with current world_id
@@ -1463,6 +1505,11 @@ class MuJoCo(BaseSimulator):
             GLFW keycode for the pressed key.
         """
         if self.commands is None:
+            return
+
+        # BACKSPACE (259) / DELETE (261): reset to initial state in the physics thread
+        if keycode in (259, 261):
+            self._pending_reset = True
             return
 
         # Handle text overlay toggle

@@ -160,48 +160,23 @@ def create_video(video_frames, fps, save_dir, output_format="mp4", wandb_logging
     temp_files_to_cleanup = []
 
     try:
-        # Step 1: Create intermediate video with OpenCV
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out = cv2.VideoWriter(str(temp_raw), fourcc, fps, (w, h))
-        temp_files_to_cleanup.append(temp_raw)
-
+        # Pipe raw RGB frames directly to ffmpeg — avoids slow cv2/mp4v intermediate step
+        ffmpeg_cmd = [
+            "ffmpeg", "-y",
+            "-f", "rawvideo", "-vcodec", "rawvideo",
+            "-s", f"{w}x{h}", "-pix_fmt", "rgb24", "-r", str(int(fps)),
+            "-i", "-",
+            "-c:v", "libx264", "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p", "-crf", "23",
+            str(final_video),
+        ]
+        proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
         for frame in video_frames:
-            # Convert RGB to BGR for OpenCV
-            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            out.write(frame_bgr)
-        out.release()
-
-        # Step 2: Apply output format
-        if output_format == "h264":
-            # Convert to H.264 using ffmpeg
-            ffmpeg_cmd = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(temp_raw),
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                "-crf",
-                "23",
-                "-maxrate",
-                "300k",
-                "-preset",
-                "medium",
-                str(final_video),
-            ]
-
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, check=True)
-            if result.returncode != 0:
-                logger.warning(f"[VIDEO] FFmpeg conversion failed: {result.stderr}")
-                logger.info("[VIDEO] Falling back to mp4v format (may have browser compatibility issues)")
-                # Fallback to original video
-                final_video = temp_raw
-        else:
-            # Use mp4v format directly - rename and remove from cleanup list
-            temp_raw.rename(final_video)
-            temp_files_to_cleanup.remove(temp_raw)
+            proc.stdin.write(frame.tobytes())
+        proc.stdin.close()
+        proc.wait()
+        if proc.returncode != 0:
+            raise RuntimeError(f"ffmpeg exited with code {proc.returncode}")
 
         # Log successful video file creation
         logger.info(f"Successfully saved video file: {final_video}")

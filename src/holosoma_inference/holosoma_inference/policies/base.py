@@ -255,7 +255,7 @@ class BasePolicy:
 
     def _init_command_components(self):
         """Initialize control-related components and commands."""
-        self.use_policy_action = False
+        self.use_policy_action = getattr(self.config.task, "auto_start", False)
         self.init_count = 0
         self.get_ready_state = False
         self.desired_base_height = self.config.task.desired_base_height

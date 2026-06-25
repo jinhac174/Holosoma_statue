@@ -106,6 +106,11 @@ class VideoConfig:
         1.0 = real-time, 2.0 = 2x faster, 0.5 = slow motion.
     """
 
+    output_fps: float = 30.0
+    """Output video frame rate in fps. Frames are subsampled from the capture rate to hit this
+    target. 30 is compatible with all media players. Set to 0 to disable subsampling and use
+    the raw capture rate (control_frequency * playback_rate)."""
+
     output_format: str = "h264"
     """Video output format ('mp4' or 'h264'). 'h264' provides better browser compatibility."""
 

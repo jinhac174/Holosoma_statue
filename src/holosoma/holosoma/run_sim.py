@@ -7,6 +7,7 @@ or evaluation environments.
 """
 
 import dataclasses
+import signal
 import sys
 import traceback
 
@@ -46,6 +47,11 @@ def run_simulation(config: RunSimConfig):
     logger.info(f"Robot: {config.robot.asset.robot_type}")
     logger.info(f"Simulator: {config.simulator._target_}")
     logger.info(f"Terrain: {config.terrain.terrain_term.mesh_type} ({config.terrain.terrain_term.func})")
+
+    # Make SIGTERM (kill <pid>) trigger a clean shutdown so video is flushed to disk.
+    def _sigterm_handler(signum, frame):
+        raise KeyboardInterrupt()
+    signal.signal(signal.SIGTERM, _sigterm_handler)
 
     try:
         # Use shared utils for setup

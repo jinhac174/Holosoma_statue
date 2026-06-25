@@ -36,4 +36,15 @@ def create_input(policy: BasePolicy, source: InputSource, role: str) -> VelCmdPr
             vel_timeout=policy.config.task.ros_vel_timeout,
         )
 
+    if source == "scripted":
+        from holosoma_inference.inputs.impl.scripted import ScriptedInput
+
+        t = policy.config.task
+        return ScriptedInput(
+            vx_range=t.scripted_vx_range,
+            vy_range=t.scripted_vy_range,
+            vyaw_range=t.scripted_vyaw_range,
+            command_interval=t.scripted_command_interval,
+        )
+
     raise ValueError(f"Unknown input source: {source}")
