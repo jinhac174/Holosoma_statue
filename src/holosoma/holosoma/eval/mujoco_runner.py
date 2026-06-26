@@ -169,14 +169,18 @@ class MujocoEvalRunner:
         spec = mujoco.MjSpec.from_file(str(xml_path))
         spec.option.timestep = 1.0 / self.physics_fps
         spec.option.gravity = [0, 0, -9.81]
-        # add a ground plane (friction matches training default; see scene_manager fix)
-        spec.worldbody.add_geom(
+        # Ground plane — friction AND contact softness (solimp/solref) matched to the
+        # live MuJoCo sim's scene_manager so this single-process runner is physically
+        # faithful to the interactive sim2sim setup.
+        floor = spec.worldbody.add_geom(
             name="eval_floor",
             type=mujoco.mjtGeom.mjGEOM_PLANE,
             size=[0, 0, 0.05],
             pos=[0, 0, 0],
-            friction=[floor_friction, 0.005, 0.0001],
+            friction=[floor_friction, 0.005, 0.001],
         )
+        floor.solimp = [0.99, 0.99, 0.01, 0.5, 2]
+        floor.solref = [0.001, 1]
         self.model = spec.compile()
         self.data = mujoco.MjData(self.model)
         self._floor_friction = floor_friction
