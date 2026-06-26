@@ -123,6 +123,56 @@ def plot_cot_vs_velocity(df, out: Path, compare=None) -> None:
     plt.close(fig)
 
 
+def _cmd_label(df):
+    return df.apply(lambda r: f"vx{r.cmd_vx:+.2f}\nvy{r.cmd_vy:+.2f}\nyaw{r.cmd_vyaw:+.2f}", axis=1)
+
+
+def plot_fall_rate(df, out: Path, compare=None) -> None:
+    """Fall rate per command (bar chart, IG vs MuJoCo)."""
+    fig, ax = plt.subplots(figsize=(13, 4))
+    d = df.copy()
+    d["cmd"] = _cmd_label(d)
+    fr = d.groupby("cmd")["fell"].mean()
+    x = np.arange(len(fr))
+    w = 0.4 if compare is not None else 0.7
+    ax.bar(x - (w / 2 if compare is not None else 0), fr.values * 100, w, label="MuJoCo", color="C0")
+    if compare is not None:
+        c = compare.copy()
+        c["cmd"] = _cmd_label(c)
+        cr = c.groupby("cmd")["fell"].mean().reindex(fr.index).fillna(0)
+        ax.bar(x + w / 2, cr.values * 100, w, label="IsaacGym", color="C1")
+        ax.legend()
+    ax.set_xticks(x)
+    ax.set_xticklabels(fr.index, fontsize=6)
+    ax.set_ylabel("fall rate (%)")
+    ax.set_title("Fall rate per command")
+    ax.grid(alpha=0.3, axis="y")
+    fig.tight_layout()
+    fig.savefig(out / "fall_rate_per_command.png", dpi=120)
+    plt.close(fig)
+
+
+def plot_foot_clearance(df, out: Path, compare=None) -> None:
+    """Foot clearance distribution (min swing clearance per rollout)."""
+    fig, ax = plt.subplots(figsize=(7, 4))
+    d = df[~df["fell"]]["foot_clearance_min_m"].to_numpy(dtype=float)
+    d = d[np.isfinite(d)]
+    ax.hist(d, bins=25, alpha=0.6, label="MuJoCo")
+    if compare is not None:
+        c = compare[~compare["fell"]]["foot_clearance_min_m"].to_numpy(dtype=float)
+        c = c[np.isfinite(c)]
+        ax.hist(c, bins=25, alpha=0.6, label="IsaacGym")
+        ax.legend()
+    ax.axvline(0.0, color="r", ls="--", label="scuffing (0)")
+    ax.set_xlabel("min foot clearance during swing (m)")
+    ax.set_ylabel("count")
+    ax.set_title("Foot clearance distribution (lower = scuffing risk)")
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out / "foot_clearance.png", dpi=120)
+    plt.close(fig)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Generate eval plots")
     ap.add_argument("--rollout-dir", required=True)
@@ -140,6 +190,8 @@ def main() -> None:
     plot_tracking_vs_command(df, out, compare)
     plot_symmetry_distribution(df, out, compare)
     plot_cot_vs_velocity(df, out, compare)
+    plot_fall_rate(df, out, compare)
+    plot_foot_clearance(df, out, compare)
 
     # torque timeseries for a few rollouts (prefer ones with violations)
     paths = sorted(Path(args.rollout_dir).glob("*.npz"))

@@ -37,3 +37,7 @@ __pycache__
 .logs/
 holosoma_config.yaml
 wandb-metadata.json
+# eval: track report artifacts (scorecards, csvs, plots, changelog), not raw rollouts
+/eval/runs/**/mujoco/
+/eval/runs/**/isaacgym/
+/eval/_archive/
