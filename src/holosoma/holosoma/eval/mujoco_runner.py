@@ -25,13 +25,9 @@ from holosoma.config_values.robot import statue_28dof
 from holosoma.simulator.mujoco.tensor_views import quat_mujoco_to_holosoma
 
 
-def _world_to_body_angvel(quat_wxyz: np.ndarray, w_world: np.ndarray) -> np.ndarray:
-    """Rotate angular velocity world->body. Mirrors the ZMQ bridge exactly."""
-    q_w, q_xyz = quat_wxyz[0], quat_wxyz[1:]
-    a = w_world * (2.0 * q_w**2 - 1.0)
-    b = np.cross(q_xyz, w_world) * (q_w * 2.0)
-    c = q_xyz * (np.dot(q_xyz, w_world) * 2.0)
-    return (a - b + c).astype(np.float32)
+# NOTE: MuJoCo's freejoint angular velocity (qvel[3:6]) is already in the body frame,
+# which is what the policy expects. We pass it through directly — see zmq_bridge.py for
+# why a world->body rotation here is a bug (corrupts balance feedback while turning).
 
 
 @dataclass
@@ -83,7 +79,7 @@ class MujocoEvalInterface:
         q = d.qpos[r.dof_qpos_addrs].astype(np.float32)
         dq = d.qvel[r.dof_qvel_addrs].astype(np.float32)
         quat_wxyz = d.qpos[r.fj_qpos + 3 : r.fj_qpos + 7].astype(np.float32)
-        omega_body = _world_to_body_angvel(quat_wxyz, d.qvel[r.fj_qvel + 3 : r.fj_qvel + 6].astype(np.float32))
+        omega_body = d.qvel[r.fj_qvel + 3 : r.fj_qvel + 6].astype(np.float32)  # already body-frame
         base_pos = d.qpos[r.fj_qpos : r.fj_qpos + 3].astype(np.float32)
         base_lin = d.qvel[r.fj_qvel : r.fj_qvel + 3].astype(np.float32)
         return np.concatenate([base_pos, quat_wxyz, q, base_lin, omega_body, dq]).reshape(1, -1)
