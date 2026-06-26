@@ -281,8 +281,11 @@ def generate_all(mj, ig, mj_dir, ig_dir, out: Path) -> None:
     plot_torque_per_joint(sorted(Path(mj_dir).glob("*.npz")), out,
                           sorted(Path(ig_dir).glob("*.npz")) if ig_dir else None)
     plot_gait_quality(mj, out, ig)
-    # deep-dive on the worst torque-margin rollouts
-    worst = mj.sort_values("torque_safety_factor").head(2)["name"].tolist()
+    # deep-dive on the worst torque-margin rollouts AMONG SURVIVORS (so the torque
+    # trace reflects walking, not a fall). Fall back to all if none survive.
+    survivors = mj[~mj["fell"]]
+    pool = survivors if len(survivors) else mj
+    worst = pool.sort_values("torque_safety_factor").head(2)["name"].tolist()
     for p in sorted(Path(mj_dir).glob("*.npz")):
         if p.stem in worst:
             plot_torque_timeseries(p, out)
