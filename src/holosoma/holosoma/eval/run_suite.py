@@ -66,6 +66,25 @@ def sample_dr(rng: np.random.Generator, enable: bool) -> DRParams:
     )
 
 
+def _run_jobs(model_path: str, jobs: list, out_dir: str, duration: float, settle: float) -> int:
+    """Build one runner and execute a list of (vx,vy,vyaw,label,i,seed,DRParams) jobs.
+
+    Used by each worker process. Each rollout is independent, so workers never share
+    state. ONNX/OMP threads are capped to 1 to avoid oversubscription across workers.
+    """
+    import os
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    runner = MujocoEvalRunner(model_path=model_path)
+    out = Path(out_dir)
+    for vx, vy, vyaw, label, i, seed, dr in jobs:
+        rc = RolloutConfig(
+            seed=seed, duration_s=duration, settle_s=settle,
+            segments=[CommandSegment(vx, vy, vyaw, duration)], dr=dr, label=label,
+        )
+        runner.run_rollout(out / f"{label}_{i:04d}.npz", rc)
+    return len(jobs)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="MuJoCo sim2sim eval suite")
     ap.add_argument("--model-path", required=True)
@@ -74,6 +93,9 @@ def main() -> None:
     ap.add_argument("--duration", type=float, default=12.0)
     ap.add_argument("--settle", type=float, default=0.5)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--workers", type=int, default=1,
+                    help="Parallel worker processes (rollouts are independent). Keeps the full "
+                         "n-per-command; just splits the work. Try 8 on a multi-core box.")
     ap.add_argument("--no-dr", action="store_true", help="Disable domain randomization (nominal model)")
     ap.add_argument("--commands", default=None,
                     help="Optional 'vx,vy,vyaw;...' list overriding the default grid")
@@ -90,32 +112,36 @@ def main() -> None:
     else:
         commands = DEFAULT_COMMANDS
 
-    logger.info(f"Building runner (model={args.model_path})")
-    runner = MujocoEvalRunner(model_path=args.model_path)
-
-    total = len(commands) * args.n_per_command
-    logger.info(f"Running {total} rollouts ({len(commands)} commands x {args.n_per_command}), "
-                f"DR={'off' if args.no_dr else 'on'}, dur={args.duration}s")
+    # Build the full, deterministic job list in the parent (seeds independent of worker
+    # count, so results are reproducible regardless of --workers).
     rng = np.random.default_rng(args.seed)
-    t0 = time.time()
-    done = 0
+    jobs = []
     for vx, vy, vyaw, label in commands:
         for i in range(args.n_per_command):
             seed = int(rng.integers(0, 2**31 - 1))
-            rc = RolloutConfig(
-                seed=seed,
-                duration_s=args.duration,
-                settle_s=args.settle,
-                segments=[CommandSegment(vx, vy, vyaw, args.duration)],
-                dr=sample_dr(np.random.default_rng(seed), enable=not args.no_dr),
-                label=label,
-            )
+            dr = sample_dr(np.random.default_rng(seed), enable=not args.no_dr)
+            jobs.append((vx, vy, vyaw, label, i, seed, dr))
+
+    total = len(jobs)
+    logger.info(f"Running {total} rollouts ({len(commands)} commands x {args.n_per_command}), "
+                f"DR={'off' if args.no_dr else 'on'}, dur={args.duration}s, workers={args.workers}")
+    t0 = time.time()
+
+    if args.workers <= 1:
+        runner = MujocoEvalRunner(model_path=args.model_path)
+        for n, (vx, vy, vyaw, label, i, seed, dr) in enumerate(jobs, 1):
+            rc = RolloutConfig(seed=seed, duration_s=args.duration, settle_s=args.settle,
+                               segments=[CommandSegment(vx, vy, vyaw, args.duration)], dr=dr, label=label)
             runner.run_rollout(out / f"{label}_{i:04d}.npz", rc)
-            done += 1
-            if done % 10 == 0 or done == total:
-                rate = done / (time.time() - t0)
-                eta = (total - done) / rate if rate > 0 else 0
-                logger.info(f"  {done}/{total}  ({rate:.1f} rollouts/s, ETA {eta/60:.1f} min)")
+            if n % 10 == 0 or n == total:
+                rate = n / (time.time() - t0)
+                logger.info(f"  {n}/{total}  ({rate:.1f}/s, ETA {(total-n)/max(rate,1e-9)/60:.1f} min)")
+    else:
+        import multiprocessing as mp
+        chunks = [jobs[w::args.workers] for w in range(args.workers)]  # round-robin split
+        ctx = mp.get_context("spawn")
+        with ctx.Pool(args.workers) as pool:
+            pool.starmap(_run_jobs, [(args.model_path, c, str(out), args.duration, args.settle) for c in chunks])
 
     logger.info(f"Done. {total} rollouts in {out}/  ({(time.time()-t0)/60:.1f} min)")
     logger.info(f"Next: python -m holosoma.eval.analyze --rollout-dir {out}")
