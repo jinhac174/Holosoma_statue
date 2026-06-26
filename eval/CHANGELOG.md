@@ -44,6 +44,29 @@ the learned turn relies on PhysX grip and slips out in MuJoCo. Confirmed sim2sim
 randomize foot torsional friction (± motor-strength DR) — retrain, re-eval, compare
 yaw fall rate + stance slip. See `runs/run01_baseline/run_info.md`.
 
+## run02_angvel_fix — 2026-06-26
+**Same policy as run01 (model_0050000). NOT a retrain — a sim2sim bridge bug fix.**
+
+**Changed:** removed an erroneous world→body rotation of the base angular velocity in
+the ZMQ bridge (`zmq_bridge.py`) + eval runner. MuJoCo's freejoint `qvel[3:6]` is already
+body-frame; the extra rotation was ≈identity upright but, while turning, rotated the
+roll/pitch angular-velocity by the accumulating yaw → corrupted balance feedback → fell.
+
+**Found by:** friction ablation diagnostic (ruled out friction: even 5× sliding + high
+torsional → still 100% fall), then toggling the rotation (100% → 0%).
+
+**Result:** **fall rate 33.3% → 0.0%**; yaw/mixed 100% → 0% fall. Sim2sim gap now
+PASS on all axes (vx −10%, vy −9%, yaw −19%; spec <30%). MuJoCo fall 0.0% vs IG 0.9%.
+Sim2sim transfer **solved, no retraining** (spec §3 satisfied).
+
+**Genuine remaining fails (now on a robot that turns):** symmetry 0.114 (≤0.10),
+torque safety 1.00 (≥1.25; ankle_roll binding), scuff 0.069 (≤0.02). Tracking/CoT/
+clearance/pos-limits all PASS.
+
+**→ Next (run03, first real RETRAIN):** reward-weight tuning for the three fails.
+Likely: torque penalty (ankle_roll margin) + symmetry weight; revisit foot-clearance/
+scuff term. One lever at a time.
+
 <!-- template for next entry:
 ## runNN_<short-name> — <date>
 **Checkpoint:** ...
