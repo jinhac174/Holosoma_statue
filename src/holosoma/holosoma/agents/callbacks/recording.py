@@ -86,6 +86,14 @@ class EvalRecordingCallback(RLEvalCallback):
         self._metadata["dof_pos_lower_limits"] = list(robot_cfg.dof_pos_lower_limit_list)
         self._metadata["dof_pos_upper_limits"] = list(robot_cfg.dof_pos_upper_limit_list)
         self._metadata["velocity_limits"] = list(robot_cfg.dof_vel_limit_list)
+        self._metadata["simulator"] = "isaacgym"
+        # Total robot mass (kg) for Cost-of-Transport; sum of link masses if available.
+        try:
+            masses = getattr(sim, "_rigid_body_mass", None)
+            if masses is not None:
+                self._metadata["total_mass"] = float(np.asarray(masses[self.env_id]).sum())
+        except Exception:  # noqa: BLE001 -- metadata is best-effort
+            pass
         asset_cfg = robot_cfg.asset
         self._metadata["urdf_path"] = str(Path(asset_cfg.asset_root) / asset_cfg.urdf_file)
 
