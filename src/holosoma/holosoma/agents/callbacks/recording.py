@@ -87,11 +87,11 @@ class EvalRecordingCallback(RLEvalCallback):
         self._metadata["dof_pos_upper_limits"] = list(robot_cfg.dof_pos_upper_limit_list)
         self._metadata["velocity_limits"] = list(robot_cfg.dof_vel_limit_list)
         self._metadata["simulator"] = "isaacgym"
-        # Total robot mass (kg) for Cost-of-Transport; sum of link masses if available.
+        # Total robot mass (kg) for Cost-of-Transport: sum the asset's rigid-body masses
+        # via the gym API (nominal, pre-randomization).
         try:
-            masses = getattr(sim, "_rigid_body_mass", None)
-            if masses is not None:
-                self._metadata["total_mass"] = float(np.asarray(masses[self.env_id]).sum())
+            props = sim.gym.get_asset_rigid_body_properties(sim.robot_asset)
+            self._metadata["total_mass"] = float(sum(p.mass for p in props))
         except Exception:  # noqa: BLE001 -- metadata is best-effort
             pass
         asset_cfg = robot_cfg.asset
