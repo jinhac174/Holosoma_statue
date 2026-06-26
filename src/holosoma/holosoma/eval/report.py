@@ -152,19 +152,10 @@ def main() -> None:
     (run_dir / "scorecard.txt").write_text(scorecard + "\n")
     print(scorecard)
 
-    # plots
+    # plots (tuning-focused set)
     from holosoma.eval import plots as P
     plots_dir = run_dir / "plots"
-    plots_dir.mkdir(exist_ok=True)
-    P.plot_tracking_vs_command(mj, plots_dir, ig)
-    P.plot_symmetry_distribution(mj, plots_dir, ig)
-    P.plot_cot_vs_velocity(mj, plots_dir, ig)
-    P.plot_fall_rate(mj, plots_dir, ig)
-    P.plot_foot_clearance(mj, plots_dir, ig)
-    worst = mj.sort_values("torque_safety_factor").head(3)["name"].tolist()
-    for p in sorted(mj_dir.glob("*.npz")):
-        if p.stem in worst:
-            P.plot_torque_timeseries(p, plots_dir)
+    P.generate_all(mj, ig, mj_dir, ig_dir if (ig is not None) else None, plots_dir)
 
     # run_info template (don't overwrite if it exists)
     info = run_dir / "run_info.md"
