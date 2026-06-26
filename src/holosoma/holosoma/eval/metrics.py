@@ -58,8 +58,9 @@ class RolloutMetrics:
     mean_mech_power_w: float
     # gait quality
     symmetry_index: float
-    foot_clearance_mean_m: float
-    foot_clearance_min_m: float
+    foot_clearance_mean_m: float       # mean swing-apex height (lift quality)
+    foot_clearance_min_m: float        # lowest swing apex
+    scuff_fraction: float              # fraction of time a foot drags near the ground
     # hardware safety
     torque_safety_factor: float       # min over joints of stall/peak
     worst_torque_joint: str
@@ -158,9 +159,9 @@ def cost_of_transport(r: RolloutData, end_idx: int | None = None) -> tuple[float
     return mean_p / (mass * GRAVITY * speed), mean_p
 
 
-def _foot_contact_and_height(r: RolloutData, contact_h: float = 0.07) -> tuple[np.ndarray, np.ndarray] | None:
-    """Return (foot_height [T,2], in_contact [T,2]) for (left,right) feet, or None
-    if body positions / foot bodies aren't available."""
+def _foot_pos(r: RolloutData) -> tuple[np.ndarray, np.ndarray] | None:
+    """Return (height [T,2], xy [T,2,2]) for (left,right) feet, ground-referenced,
+    or None if body positions / foot bodies aren't available."""
     if not r.has("body_pos_w"):
         return None
     li = r.body_index("left_foot_contact") or r.body_index("left_ankle_roll")
@@ -169,10 +170,18 @@ def _foot_contact_and_height(r: RolloutData, contact_h: float = 0.07) -> tuple[n
         return None
     bp = r.get("body_pos_w")  # [T, B, 3]
     h = np.stack([bp[:, li, 2], bp[:, ri, 2]], axis=-1)  # [T, 2]
-    ground = np.percentile(h, 2)  # robust ground reference
-    h = h - ground
-    in_contact = h < contact_h
-    return h, in_contact
+    h = h - np.percentile(h, 2)  # robust ground reference
+    xy = np.stack([bp[:, li, :2], bp[:, ri, :2]], axis=1)  # [T, 2, 2]
+    return h, xy
+
+
+def _foot_contact_and_height(r: RolloutData, contact_h: float = 0.07) -> tuple[np.ndarray, np.ndarray] | None:
+    """Return (foot_height [T,2], in_contact [T,2]) for (left,right) feet."""
+    fp = _foot_pos(r)
+    if fp is None:
+        return None
+    h, _ = fp
+    return h, h < contact_h
 
 
 def symmetry_index(r: RolloutData) -> float:
@@ -224,6 +233,23 @@ def foot_clearance(r: RolloutData) -> tuple[float, float]:
     return float(np.mean(peaks)), float(np.min(peaks))
 
 
+def foot_scuffing(r: RolloutData, scuff_h: float = 0.03, scuff_speed: float = 0.2) -> float:
+    """Fraction of timesteps a foot is *dragging*: moving horizontally faster than
+    ``scuff_speed`` (m/s) while its height is below ``scuff_h`` (m).
+
+    This is the direct "no foot-scuffing during swing" detector — unlike swing-apex,
+    it catches a foot that clips/drags the ground at toe-off or touchdown. 0 = clean.
+    """
+    fp = _foot_pos(r)
+    if fp is None:
+        return float("nan")
+    h, xy = fp
+    horiz_speed = np.linalg.norm(np.diff(xy, axis=0), axis=-1) / r.dt  # [T-1, 2]
+    low = h[1:] < scuff_h
+    drag = low & (horiz_speed > scuff_speed)
+    return float(drag.mean())
+
+
 def torque_safety(r: RolloutData) -> tuple[float, str, int]:
     """(min safety factor, worst joint name, n joints over 0.8*stall).
 
@@ -260,6 +286,7 @@ def compute_metrics(r: RolloutData) -> RolloutMetrics:
     cot, mean_p = cost_of_transport(r, end_idx=end_idx)
     si = symmetry_index(r)
     fc_mean, fc_min = foot_clearance(r)
+    scuff = foot_scuffing(r)
     sf, worst, n_tv = torque_safety(r)
     cmd = r.get("commanded_velocity")
     cmd_mode = cmd[min(int(0.6 / r.dt), cmd.shape[0] - 1)]  # representative command
@@ -282,6 +309,7 @@ def compute_metrics(r: RolloutData) -> RolloutMetrics:
         symmetry_index=si,
         foot_clearance_mean_m=fc_mean,
         foot_clearance_min_m=fc_min,
+        scuff_fraction=scuff,
         torque_safety_factor=sf,
         worst_torque_joint=worst,
         n_torque_violations=n_tv,

@@ -67,6 +67,7 @@ def spec_summary(df: pd.DataFrame) -> dict:
         "min_foot_clearance": float(
             np.nanmin(ok["foot_clearance_min_m"].to_numpy(dtype=float)) if len(ok) else float("nan")
         ),
+        "mean_scuff_fraction": _mean("scuff_fraction"),
     }
 
 

@@ -12,6 +12,7 @@ SPEC COMPLIANCE  (MuJoCo sim2sim — the deployment-facing numbers)
   [FAIL] min torque safety factor               1.000   (target >= 1.25)
   [PASS] cost of transport                      0.628   (target <= 2.5)
   [PASS] min foot clearance (m)                 0.070   (target > 0.0)
+  [FAIL] foot scuff fraction                    0.066   (target <= 0.02)
   [FAIL] joint pos-limit violations            516377   (target == 0)
   [INFO] fall rate                              33.3%
   [INFO] torque-limit violations (step*joint)      3994

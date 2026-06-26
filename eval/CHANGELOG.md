@@ -33,10 +33,16 @@ Spec thresholds (targets to beat):
 **Turning is learned in IsaacGym (≈0% fall on yaw) but fails to transfer to MuJoCo
 (100% fall)** → sim2sim / yaw-contact problem, not a training problem.
 
-**→ Next (run02):** target the yaw transfer failure. Leading hypothesis: foot–ground
-torsional/contact dynamics differ between PhysX and MuJoCo under turning. Candidate
-levers (pick after mechanism check): friction/contact DR widening, motor-strength DR,
-or obs normalization. See `runs/run01_baseline/run_info.md`.
+**Failure-mode search (yaw):** stance-foot slip during contact is **1.5–2.2× higher
+in MuJoCo for pure-yaw commands** (vs ~1.0× for translation). A yaw rollout turns
+fine ~3 s, then slip accumulates → tilt 4°→57° → falls @5.3 s. Mechanism: turning
+loads *torsional* foot contact, but training only randomizes *sliding* friction, so
+the learned turn relies on PhysX grip and slips out in MuJoCo. Confirmed sim2sim
+(contact), not training. Also: foot **scuffing fails** (0.066 vs ≤0.02).
+
+**→ Next (run02):** widen contact DR in training — lower friction floor and/or
+randomize foot torsional friction (± motor-strength DR) — retrain, re-eval, compare
+yaw fall rate + stance slip. See `runs/run01_baseline/run_info.md`.
 
 <!-- template for next entry:
 ## runNN_<short-name> — <date>

@@ -22,8 +22,32 @@ locate the first failure mode from data.
 - Symmetry 0.118 (just over the 0.10 target).
 - Forward tracking degrades with speed (rms_vx 0.33 @ 1.0 m/s commanded).
 
-## → Next lever
-Investigate the yaw transfer mechanism before changing anything (compare a yaw
-rollout IG vs MuJoCo: base tilt, foot slip, torque saturation). Then, per spec
-§4.4 ("sim2sim gap large → revisit DR / obs normalization"), most likely widen
-foot-contact / friction (and possibly motor-strength) DR and retrain.
+- Foot **scuffing fails** (scuff fraction 0.066 vs target ≤0.02): a foot drags
+  near the ground ~7% of the time. (The swing-apex "min foot clearance" metric
+  looked fine at 0.07 m — apex height hides drag; the horizontal-speed-near-ground
+  detector catches it.)
+
+## Failure-mode search — yaw transfer (done)
+Compared a `yawL05` rollout IG (survives) vs MuJoCo (falls @5.3s):
+
+- **IsaacGym:** tracks yaw 0.5 steadily, tilt stable ~3.5°, height 0.77 throughout.
+- **MuJoCo:** turns fine for ~3 s, then stance-foot slip accumulates → tilt grows
+  (4°→11°→57°) → catastrophic fall at ~5.3 s, ending face-down (tilt >100°).
+- **Smoking gun — stance-foot slip during contact:** MuJoCo 0.18 m/s vs IG 0.09 m/s.
+  Aggregated over 20 rollouts/command: pure-yaw slip ratio MuJoCo/IG = **1.5–2.2×**,
+  while translation (fwd/lat) is ~1.0× (similar or lower). Turning specifically
+  induces excess foot slip in MuJoCo.
+
+**Mechanism:** turning loads the foot in *torsional/rotational* contact. Training
+friction DR randomizes only **sliding** friction `[0.5, 1.25]`; torsional contact
+is never varied, so the policy learned a turn that relies on PhysX's foot grip and
+slips out in MuJoCo. This is the "contact model differences → sliding" failure mode
+(§3.4) — a sim2sim problem, confirmed not a training-capability problem.
+
+## → Next lever (run02)
+Per spec §4.4 ("sim2sim gap large → revisit DR / motor strength / friction"):
+widen contact DR in training — lower the friction floor and/or randomize foot
+torsional friction (and consider motor-strength DR) — so the policy learns turning
+robust to low foot grip. Re-run the full eval and compare yaw fall rate + stance
+slip. (Secondary: torque-margin and symmetry fails will likely need their own
+reward-weight tuning afterward.)

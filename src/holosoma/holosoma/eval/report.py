@@ -68,6 +68,7 @@ def build_scorecard(run_name: str, mj: pd.DataFrame, ig: pd.DataFrame | None) ->
     L.append(_line(_check(s["min_torque_safety_factor"], SPEC["torque_safety_factor"], less=False), "min torque safety factor", s["min_torque_safety_factor"], ">=", SPEC["torque_safety_factor"]))
     L.append(_line(_check(s["mean_cot"], SPEC["cot_at_0p8"]), "cost of transport", s["mean_cot"], "<=", SPEC["cot_at_0p8"]))
     L.append(_line(_check(s["min_foot_clearance"], 0.0, less=False), "min foot clearance (m)", s["min_foot_clearance"], ">", 0.0))
+    L.append(_line(_check(s["mean_scuff_fraction"], 0.02), "foot scuff fraction", s["mean_scuff_fraction"], "<=", 0.02))
     L.append(f"  [{'PASS' if s['total_pos_limit_violations']==0 else 'FAIL'}] {'joint pos-limit violations':34s} {s['total_pos_limit_violations']:>9d}   (target == 0)")
     L.append(f"  [INFO] {'fall rate':34s} {s['fall_rate']*100:>8.1f}%")
     L.append(f"  [INFO] {'torque-limit violations (step*joint)':34s} {s['total_torque_violations']:>9d}")
