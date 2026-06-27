@@ -56,6 +56,10 @@ class RolloutConfig:
     segments: list[CommandSegment] = field(default_factory=list)
     dr: DRParams = field(default_factory=DRParams)
     label: str = ""
+    # Robustness: external push (spec: 100 N for 0.2 s at the torso). 0 force = no push.
+    push_force: float = 0.0               # N
+    push_duration_s: float = 0.2
+    push_time_s: float = 4.0              # when the push starts (after settle, mid-walk)
 
 
 # ---- in-process interface -----------------------------------------------------
@@ -141,6 +145,8 @@ class MujocoEvalRunner:
         physics_fps: int = 2000,
         policy_fps: int = 50,
         floor_friction: float = 1.0,
+        terrain: str = "flat",            # "flat" or "rough" (heightfield)
+        rough_height: float = 0.05,       # peak-to-peak height of rough terrain (m)
     ):
         self.robot_cfg = statue_28dof
         self.n_dof = self.robot_cfg.dof_obs_size
@@ -148,6 +154,8 @@ class MujocoEvalRunner:
         self.policy_fps = policy_fps
         self.decimation = physics_fps // policy_fps
         self.dt = 1.0 / policy_fps
+        self.terrain = terrain
+        self.rough_height = rough_height
 
         self._build_model(floor_friction)
         self._resolve_addressing()
@@ -165,21 +173,29 @@ class MujocoEvalRunner:
         spec = mujoco.MjSpec.from_file(str(xml_path))
         spec.option.timestep = 1.0 / self.physics_fps
         spec.option.gravity = [0, 0, -9.81]
-        # Ground plane — friction AND contact softness (solimp/solref) matched to the
-        # live MuJoCo sim's scene_manager so this single-process runner is physically
-        # faithful to the interactive sim2sim setup.
-        floor = spec.worldbody.add_geom(
-            name="eval_floor",
-            type=mujoco.mjtGeom.mjGEOM_PLANE,
-            size=[0, 0, 0.05],
-            pos=[0, 0, 0],
-            friction=[floor_friction, 0.005, 0.001],
-        )
+        if self.terrain == "rough":
+            # Rough terrain via a heightfield (robustness test, spec §1).
+            nrow = ncol = 64
+            rng = np.random.default_rng(0)
+            hdata = rng.random(nrow * ncol).astype(np.float64)  # 0..1, scaled by elevation z
+            spec.add_hfield(name="rough", size=[8, 8, self.rough_height, 0.1],
+                            nrow=nrow, ncol=ncol, userdata=list(hdata))
+            floor = spec.worldbody.add_geom(
+                name="eval_floor", type=mujoco.mjtGeom.mjGEOM_HFIELD, hfieldname="rough",
+                pos=[0, 0, 0], friction=[floor_friction, 0.005, 0.001],
+            )
+        else:
+            # Flat ground plane — friction + contact softness matched to the live sim.
+            floor = spec.worldbody.add_geom(
+                name="eval_floor", type=mujoco.mjtGeom.mjGEOM_PLANE,
+                size=[0, 0, 0.05], pos=[0, 0, 0], friction=[floor_friction, 0.005, 0.001],
+            )
         floor.solimp = [0.99, 0.99, 0.01, 0.5, 2]
         floor.solref = [0.001, 1]
         self.model = spec.compile()
         self.data = mujoco.MjData(self.model)
         self._floor_friction = floor_friction
+        self.floor_gid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "eval_floor")
 
     def _resolve_addressing(self) -> None:
         m = self.model
@@ -296,8 +312,13 @@ class MujocoEvalRunner:
         buffers: dict[str, list] = {k: [] for k in (
             "dof_pos_target", "dof_pos", "dof_vel", "torques", "torques_substep", "dof_vel_substep",
             "actions", "root_pos", "root_quat_xyzw", "root_lin_vel", "root_ang_vel",
-            "body_pos_w", "body_quat_xyzw", "commanded_velocity",
+            "body_pos_w", "body_quat_xyzw", "commanded_velocity", "self_collision",
         )}
+        # External push (robustness): horizontal force on the pelvis during the push window.
+        push_dir = np.zeros(3, dtype=np.float64)
+        if rc.push_force > 0:
+            ang = np.random.default_rng(rc.seed + 7).uniform(0, 2 * np.pi)
+            push_dir[:2] = [np.cos(ang), np.sin(ang)]
 
         for step in range(n_steps):
             t = step * self.dt
@@ -305,9 +326,16 @@ class MujocoEvalRunner:
             self.policy._apply_velocity(VelCmd(lin_vel=(vx, vy), ang_vel=vyaw))
             if getattr(self.policy, "use_phase", False):
                 self.policy.update_phase_time()
+            # apply push force for its window (cleared otherwise)
+            in_push = rc.push_force > 0 and rc.push_time_s <= t < rc.push_time_s + rc.push_duration_s
+            self.data.xfrc_applied[self.pelvis_body_id, :3] = push_dir * rc.push_force if in_push else 0.0
             self.policy.policy_action()  # steps physics `decimation` times via interface
 
             d = self.data
+            # self-collision: contacts not involving the floor = robot geom vs robot geom
+            nsc = sum(1 for c in range(d.ncon)
+                      if d.contact[c].geom1 != self.floor_gid and d.contact[c].geom2 != self.floor_gid)
+            buffers["self_collision"].append(np.float32(nsc))
             buffers["dof_pos"].append(d.qpos[self.dof_qpos_addrs].astype(np.float32).copy())
             buffers["dof_vel"].append(d.qvel[self.dof_qvel_addrs].astype(np.float32).copy())
             buffers["torques"].append(self.interface.last_tau.copy())
@@ -340,6 +368,7 @@ class MujocoEvalRunner:
             "seed": rc.seed, "label": rc.label,
             "friction": rc.dr.friction, "added_base_mass": rc.dr.added_base_mass,
             "link_mass_scale": rc.dr.link_mass_scale,
+            "terrain": self.terrain, "push_force": rc.push_force,
         }
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)

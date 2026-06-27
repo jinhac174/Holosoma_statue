@@ -66,7 +66,7 @@ def sample_dr(rng: np.random.Generator, enable: bool) -> DRParams:
     )
 
 
-def _run_jobs(model_path: str, jobs: list, out_dir: str, duration: float, settle: float) -> int:
+def _run_jobs(model_path, jobs, out_dir, duration, settle, terrain="flat", push_force=0.0) -> int:
     """Build one runner and execute a list of (vx,vy,vyaw,label,i,seed,DRParams) jobs.
 
     Used by each worker process. Each rollout is independent, so workers never share
@@ -74,12 +74,13 @@ def _run_jobs(model_path: str, jobs: list, out_dir: str, duration: float, settle
     """
     import os
     os.environ.setdefault("OMP_NUM_THREADS", "1")
-    runner = MujocoEvalRunner(model_path=model_path)
+    runner = MujocoEvalRunner(model_path=model_path, terrain=terrain)
     out = Path(out_dir)
     for vx, vy, vyaw, label, i, seed, dr in jobs:
         rc = RolloutConfig(
             seed=seed, duration_s=duration, settle_s=settle,
             segments=[CommandSegment(vx, vy, vyaw, duration)], dr=dr, label=label,
+            push_force=push_force,
         )
         runner.run_rollout(out / f"{label}_{i:04d}.npz", rc)
     return len(jobs)
@@ -99,6 +100,10 @@ def main() -> None:
     ap.add_argument("--no-dr", action="store_true", help="Disable domain randomization (nominal model)")
     ap.add_argument("--commands", default=None,
                     help="Optional 'vx,vy,vyaw;...' list overriding the default grid")
+    ap.add_argument("--push", type=float, default=0.0,
+                    help="External push force (N) applied to the torso for 0.2s mid-rollout (robustness test)")
+    ap.add_argument("--terrain", choices=["flat", "rough"], default="flat",
+                    help="Ground terrain: flat (default) or rough heightfield (robustness test)")
     args = ap.parse_args()
 
     out = Path(args.out_dir)
@@ -124,14 +129,16 @@ def main() -> None:
 
     total = len(jobs)
     logger.info(f"Running {total} rollouts ({len(commands)} commands x {args.n_per_command}), "
-                f"DR={'off' if args.no_dr else 'on'}, dur={args.duration}s, workers={args.workers}")
+                f"DR={'off' if args.no_dr else 'on'}, dur={args.duration}s, workers={args.workers}, "
+                f"terrain={args.terrain}, push={args.push}N")
     t0 = time.time()
 
     if args.workers <= 1:
-        runner = MujocoEvalRunner(model_path=args.model_path)
+        runner = MujocoEvalRunner(model_path=args.model_path, terrain=args.terrain)
         for n, (vx, vy, vyaw, label, i, seed, dr) in enumerate(jobs, 1):
             rc = RolloutConfig(seed=seed, duration_s=args.duration, settle_s=args.settle,
-                               segments=[CommandSegment(vx, vy, vyaw, args.duration)], dr=dr, label=label)
+                               segments=[CommandSegment(vx, vy, vyaw, args.duration)], dr=dr, label=label,
+                               push_force=args.push)
             runner.run_rollout(out / f"{label}_{i:04d}.npz", rc)
             if n % 10 == 0 or n == total:
                 rate = n / (time.time() - t0)
@@ -141,7 +148,8 @@ def main() -> None:
         chunks = [jobs[w::args.workers] for w in range(args.workers)]  # round-robin split
         ctx = mp.get_context("spawn")
         with ctx.Pool(args.workers) as pool:
-            pool.starmap(_run_jobs, [(args.model_path, c, str(out), args.duration, args.settle) for c in chunks])
+            pool.starmap(_run_jobs, [(args.model_path, c, str(out), args.duration, args.settle,
+                                      args.terrain, args.push) for c in chunks])
 
     logger.info(f"Done. {total} rollouts in {out}/  ({(time.time()-t0)/60:.1f} min)")
     logger.info(f"Next: python -m holosoma.eval.analyze --rollout-dir {out}")

@@ -66,6 +66,7 @@ class RolloutMetrics:
     worst_torque_joint: str
     n_torque_violations: int          # joints exceeding 0.8*stall
     n_pos_limit_violations: int       # steps*joints outside URDF limits
+    n_self_collision_steps: int       # steps with any robot-robot (self) contact
 
     def to_row(self) -> dict:
         return asdict(self)
@@ -267,6 +268,16 @@ def torque_safety(r: RolloutData) -> tuple[float, str, int]:
     return float(sf[worst]), (names[worst] if worst < len(names) else str(worst)), n_viol
 
 
+def self_collision_steps(r: RolloutData, end_idx: int | None = None) -> int:
+    """Number of timesteps with at least one self-collision (robot-robot contact).
+    Spec: no self-collision events during a rollout."""
+    if not r.has("self_collision"):
+        return 0
+    sc = r.get("self_collision")
+    sl = slice(0, end_idx) if end_idx else slice(None)
+    return int(np.sum(sc[sl] > 0))
+
+
 def pos_limit_violations(r: RolloutData) -> int:
     """Count (step, joint) pairs where dof_pos is outside URDF limits."""
     lo = np.asarray(r.metadata.get("dof_pos_lower_limits", []), dtype=float)
@@ -314,4 +325,5 @@ def compute_metrics(r: RolloutData) -> RolloutMetrics:
         worst_torque_joint=worst,
         n_torque_violations=n_tv,
         n_pos_limit_violations=pos_limit_violations(r),
+        n_self_collision_steps=self_collision_steps(r, end_idx=end_idx),
     )
