@@ -1,0 +1,36 @@
+==================================================================
+  EVAL SCORECARD — run03_actionrate (REVERTED)
+  generated 2026-06-27
+==================================================================
+  MuJoCo rollouts: 360
+
+SPEC COMPLIANCE  (MuJoCo sim2sim — the deployment-facing numbers)
+  [PASS] tracking RMS vx (m/s)                  0.139   (target <= 0.15)
+  [PASS] tracking RMS vy (m/s)                  0.143   (target <= 0.15)
+  [PASS] tracking RMS vyaw (rad/s)              0.118   (target <= 0.2)
+  [PASS] symmetry index                         0.085   (target <= 0.1)
+  [FAIL] min torque safety factor               1.000   (target >= 1.25)
+  [PASS] cost of transport                      0.700   (target <= 2.5)
+  [PASS] min foot clearance (m)                 0.070   (target > 0.0)
+  [FAIL] foot scuff fraction                    0.072   (target <= 0.02)
+  [PASS] joint pos-limit violations                 0   (target == 0)
+  [INFO] fall rate                               0.0%
+  [INFO] torque-limit violations (step*joint)       113
+
+PER-COMMAND  (MuJoCo)
+                            fall  rms_vx  rms_vy    sym     sf
+  cmd                                                         
+  vx+0.00 vy+0.00 yaw+0.00   0.0   0.019   0.008  0.212  3.510
+  vx+0.00 vy+0.00 yaw+0.50   0.0   0.060   0.144  0.032  1.473
+  vx+0.00 vy+0.00 yaw-0.50   0.0   0.050   0.141  0.069  1.365
+  vx+0.00 vy+0.30 yaw+0.00   0.0   0.048   0.202  0.050  1.096
+  vx+0.00 vy-0.30 yaw+0.00   0.0   0.052   0.188  0.092  1.218
+  vx+0.25 vy+0.00 yaw+0.00   0.0   0.103   0.133  0.108  1.336
+  vx+0.50 vy+0.00 yaw+0.00   0.0   0.155   0.125  0.077  1.372
+  vx+0.50 vy+0.20 yaw+0.30   0.0   0.166   0.168  0.091  1.315
+  vx+0.80 vy+0.00 yaw+0.00   0.0   0.273   0.144  0.059  1.491
+  vx+0.80 vy-0.20 yaw-0.30   0.0   0.273   0.171  0.097  1.323
+  vx+1.00 vy+0.00 yaw+0.00   0.0   0.386   0.158  0.086  1.265
+  vx-0.30 vy+0.00 yaw+0.00   0.0   0.080   0.135  0.052  1.848
+
+==================================================================
