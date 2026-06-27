@@ -86,6 +86,17 @@ gait-quality metrics must be judged at full 50k, not the 15k quick-eval.
 **Conclusion:** existing minimalist knobs are exhausted for torque (needs a torque term) and
 symmetry (augmentation already on; only conservatism moved it). Reverted action_rate to −2.0.
 
+## run02 — spec-grade robustness battery (real tests) — 2026-06-27
+Upgraded the robustness tests to be spec-faithful and re-ran on run02 (baseline policy):
+- **Push: torso link** (`waist_pitch_link`), 100 N/0.2 s, 600 rollouts → **0% fall**.
+  (Earlier 0% was a pelvis push; torso has more leverage and still survives.)
+- **Rough terrain: Holosoma's real `terrain_locomotion_mix`** (trimesh rough 0.6, the
+  trained terrain), IsaacGym, 600 rollouts → **3.5% fall**, tracking RMS vx 0.135 (≈ flat).
+  (Replaces the earlier custom-heightfield approximation.)
+- **Self-collision: 0** events.
+Verdict: run02 genuinely **passes the robustness spec** with real tests. Remaining
+rigor for the final report: bump to 100 rollouts/command.
+
 ## run04_feetphase — 2026-06-26  (in progress)
 **Changed (from run02 baseline, action_rate back to −2.0):** `feet_phase` swing_height
 0.09 → 0.12, targeting scuff (0.069) — the one fail with a clean, non-conservative lever
