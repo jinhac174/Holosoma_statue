@@ -97,10 +97,20 @@ Upgraded the robustness tests to be spec-faithful and re-ran on run02 (baseline 
 Verdict: run02 genuinely **passes the robustness spec** with real tests. Remaining
 rigor for the final report: bump to 100 rollouts/command.
 
-## run04_feetphase — 2026-06-26  (in progress)
-**Changed (from run02 baseline, action_rate back to −2.0):** `feet_phase` swing_height
-0.09 → 0.12, targeting scuff (0.069) — the one fail with a clean, non-conservative lever
-(lift feet higher → more clearance). Judge at full 50k.
+## run04_feetphase — 2026-06-27  (partial win, kept direction)
+**Changed (from run02 baseline, action_rate −2.0):** `feet_phase` swing_height 0.09 → 0.12,
+targeting scuff. Trained full 50k. Eval: MuJoCo flat, 50/command.
+
+**Result (vs run02):** genuine, non-conservative improvement —
+- foot clearance 0.070 → **0.090** (feet lift higher, mechanism worked)
+- scuff 0.069 → **0.056** (↓ ~19%, but STILL FAILS <0.02)
+- tracking vx 0.115 → **0.101** (improved); vy/yaw still pass
+- symmetry 0.114 → 0.127 (~, fails); torque 1.00 (unchanged, fails); fall 0%
+Unlike run03 this didn't trade away tracking/stability → keep the change.
+
+**→ Next:** scuff still ~3× over spec. Options: push feet_phase further (0.15 / higher
+weight) to chase scuff <0.02, or accept + document. torque + symmetry still need dedicated
+reward terms (existing knobs exhausted).
 
 <!-- template for next entry:
 ## runNN_<short-name> — <date>
