@@ -149,6 +149,32 @@ def main() -> None:
         ig.to_csv(run_dir / "metrics_isaacgym.csv", index=False)
 
     scorecard = build_scorecard(name, mj, ig)
+
+    # Robustness battery (spec §1): append if push/ and/or rough/ subdirs exist.
+    import numpy as np
+    rob = ["", "ROBUSTNESS BATTERY  (spec §1)"]
+    for sub, desc in [("push", "external push 100N/0.2s — survive"),
+                      ("rough", "rough terrain — walk")]:
+        d = run_dir / sub
+        if d.exists() and any(d.glob("*.npz")):
+            t = build_table(d)
+            fr = float(t["fell"].mean()) * 100
+            sc = int(t["n_self_collision_steps"].sum())
+            mark = "PASS" if fr < 5 else "FAIL"
+            extra = ""
+            if sub == "rough":
+                ok = t[~t["fell"]]
+                extra = f", tracking RMS vx {ok['rms_vx'].mean():.3f}"
+                t.to_csv(run_dir / "metrics_rough.csv", index=False)
+            else:
+                t.to_csv(run_dir / "metrics_push.csv", index=False)
+            rob.append(f"  [{mark}] {desc:38s} fall {fr:.1f}%{extra}")
+    # self-collision from the main flat eval
+    sc_flat = int(mj["n_self_collision_steps"].sum()) if "n_self_collision_steps" in mj else 0
+    rob.append(f"  [{'PASS' if sc_flat == 0 else 'FAIL'}] {'no self-collision (flat eval)':38s} {sc_flat} steps")
+    if len(rob) > 3:
+        scorecard += "\n" + "\n".join(rob) + "\n" + "=" * 66
+
     (run_dir / "scorecard.txt").write_text(scorecard + "\n")
     print(scorecard)
 

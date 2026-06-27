@@ -39,3 +39,9 @@ SIM2SIM GAP  (IsaacGym -> MuJoCo, tracking-RMS degradation; spec < 30%)
   [PASS] rms_vyaw    IG=0.148  MJ=0.120  gap=-19%
   fall rate: IsaacGym 0.9%  vs  MuJoCo 0.0%
 ==================================================================
+
+ROBUSTNESS BATTERY  (spec §1)
+  [PASS] external push 100N/0.2s — survive      fall 0.0%
+  [PASS] rough terrain — walk                   fall 1.1%, tracking RMS vx 0.118
+  [PASS] no self-collision (flat eval)          0 steps
+==================================================================
