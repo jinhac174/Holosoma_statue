@@ -225,6 +225,10 @@ class MujocoEvalRunner:
         )
         self.base_total_mass = float(m.body_mass.sum())
         self.pelvis_body_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "pelvis_link")
+        # torso body for the push test (spec: "100 N at the torso")
+        self.torso_body_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, self.robot_cfg.torso_name)
+        if self.torso_body_id < 0:
+            self.torso_body_id = self.pelvis_body_id
         self._base_body_mass = m.body_mass.copy()
         self._base_body_inertia = m.body_inertia.copy()
         self._base_geom_friction = m.geom_friction.copy()
@@ -328,7 +332,7 @@ class MujocoEvalRunner:
                 self.policy.update_phase_time()
             # apply push force for its window (cleared otherwise)
             in_push = rc.push_force > 0 and rc.push_time_s <= t < rc.push_time_s + rc.push_duration_s
-            self.data.xfrc_applied[self.pelvis_body_id, :3] = push_dir * rc.push_force if in_push else 0.0
+            self.data.xfrc_applied[self.torso_body_id, :3] = push_dir * rc.push_force if in_push else 0.0
             self.policy.policy_action()  # steps physics `decimation` times via interface
 
             d = self.data

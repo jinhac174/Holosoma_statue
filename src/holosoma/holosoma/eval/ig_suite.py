@@ -58,6 +58,8 @@ def main() -> None:
     ap.add_argument("--n-per-command", type=int, default=100)
     ap.add_argument("--duration", type=float, default=12.0)
     ap.add_argument("--settle", type=float, default=0.5)
+    ap.add_argument("--terrain", choices=["flat", "rough"], default="flat",
+                    help="flat = plane (sim2sim gap); rough = Holosoma's real terrain term (robustness)")
     args = ap.parse_args()
 
     # IsaacGym MUST be imported before torch; do it first, before any holosoma import
@@ -78,16 +80,18 @@ def main() -> None:
     ckpt_cfg = CheckpointConfig(checkpoint=args.checkpoint)
     saved_cfg, saved_wandb = load_saved_experiment_config(ckpt_cfg)
     cfg = saved_cfg.get_eval_config()
-    # flat terrain (sim2sim gap is measured on flat; rough terrain is a separate robustness test).
-    # Plane terrain requires an empty terrain_config.
-    terrain_term = dataclasses.replace(cfg.terrain.terrain_term, mesh_type=MeshType.PLANE, terrain_config={})
-    cfg = dataclasses.replace(
-        cfg,
-        terrain=dataclasses.replace(cfg.terrain, terrain_term=terrain_term),
-        training=dataclasses.replace(cfg.training, num_envs=args.n_per_command, headless=True),
-    )
+    if args.terrain == "flat":
+        # flat plane for the sim2sim gap measurement (plane needs empty terrain_config)
+        terrain_term = dataclasses.replace(cfg.terrain.terrain_term, mesh_type=MeshType.PLANE, terrain_config={})
+        cfg = dataclasses.replace(cfg, terrain=dataclasses.replace(cfg.terrain, terrain_term=terrain_term))
+    else:
+        # rough: use Holosoma's REAL terrain term (terrain_locomotion_mix, trimesh rough 0.6 —
+        # the term the policy trained on). This is the spec's "use Holosoma's existing terrain term".
+        import holosoma.config_values.terrain as terr
+        cfg = dataclasses.replace(cfg, terrain=terr.terrain_locomotion_mix)
+    cfg = dataclasses.replace(cfg, training=dataclasses.replace(cfg.training, num_envs=args.n_per_command, headless=True))
 
-    logger.info(f"Building IsaacGym env: num_envs={args.n_per_command}, flat terrain")
+    logger.info(f"Building IsaacGym env: num_envs={args.n_per_command}, terrain={args.terrain}")
     env, device, sim_app = setup_simulation_environment(cfg)
 
     # --- build algo + load policy ---
