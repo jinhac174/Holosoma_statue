@@ -67,6 +67,30 @@ clearance/pos-limits all PASS.
 Likely: torque penalty (ankle_roll margin) + symmetry weight; revisit foot-clearance/
 scuff term. One lever at a time.
 
+## run03_actionrate — 2026-06-26  (REVERTED, negative result)
+**Changed:** FastSAC `penalty_action_rate` −2.0 → −4.0, targeting torque margin (ankle_roll
+saturating). Trained full 50k.
+
+**Result:** **net regression, reverted.**
+- torque safety: 1.000 → 1.000 (no change — action_rate cannot touch torque demand).
+- training curves worse: tracking_lin_vel reward −25%, tracking_ang_vel −20%, episode
+  length −14% (less stable). Eval tracking RMS vx 0.115 → 0.139.
+- symmetry "improved" 0.114 → 0.085 (PASS) — but this is **incidental**: over-penalizing
+  actions produced a sluggish/conservative gait that is naturally more symmetric, not a
+  genuinely better policy. Curves confirm the policy got worse.
+
+**Lessons:** (1) read training curves alongside the eval scorecard — symmetry PASS alone
+was a false positive. (2) symmetry is **not converged at 15k** (0.223@15k → 0.085@50k), so
+gait-quality metrics must be judged at full 50k, not the 15k quick-eval.
+
+**Conclusion:** existing minimalist knobs are exhausted for torque (needs a torque term) and
+symmetry (augmentation already on; only conservatism moved it). Reverted action_rate to −2.0.
+
+## run04_feetphase — 2026-06-26  (in progress)
+**Changed (from run02 baseline, action_rate back to −2.0):** `feet_phase` swing_height
+0.09 → 0.12, targeting scuff (0.069) — the one fail with a clean, non-conservative lever
+(lift feet higher → more clearance). Judge at full 50k.
+
 <!-- template for next entry:
 ## runNN_<short-name> — <date>
 **Checkpoint:** ...

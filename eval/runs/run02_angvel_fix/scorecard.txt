@@ -1,6 +1,6 @@
 ==================================================================
-  EVAL SCORECARD — run02_angvel_fix
-  generated 2026-06-26
+  EVAL SCORECARD — run02_baseline
+  generated 2026-06-27
 ==================================================================
   MuJoCo rollouts: 1200 | IsaacGym rollouts: 1200
 
