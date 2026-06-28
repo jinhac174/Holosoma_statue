@@ -104,6 +104,9 @@ def main() -> None:
                     help="External push force (N) applied to the torso for 0.2s mid-rollout (robustness test)")
     ap.add_argument("--terrain", choices=["flat", "rough"], default="flat",
                     help="Ground terrain: flat (default) or rough heightfield (robustness test)")
+    ap.add_argument("--init-joint-noise", type=float, default=None,
+                    help="Override initial-joint randomization (rad, uniform per joint). Use a large "
+                         "value (e.g. 0.4) for the 'recover from initial joint randomization' test.")
     args = ap.parse_args()
 
     out = Path(args.out_dir)
@@ -125,6 +128,8 @@ def main() -> None:
         for i in range(args.n_per_command):
             seed = int(rng.integers(0, 2**31 - 1))
             dr = sample_dr(np.random.default_rng(seed), enable=not args.no_dr)
+            if args.init_joint_noise is not None:
+                dr.init_joint_noise = args.init_joint_noise
             jobs.append((vx, vy, vyaw, label, i, seed, dr))
 
     total = len(jobs)
