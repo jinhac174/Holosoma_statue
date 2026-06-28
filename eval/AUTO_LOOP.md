@@ -43,4 +43,7 @@ near 0.20 cap). Swing height near its useful limit. Next: feet_phase **weight** 
 remains blocked (no term). | run06 | feet_phase weight 5→8 | 0.044 | 0.106 | 1.00 | 0.137 | 0.158 | REVERT (vy 0.154>spec, CoT 2.13) |
 | run07 | pose weight -0.5→-1.5 (target symmetry) | … | … | … | … | … | training |
 
+| run07 | pose -0.5→-1.5 | 0.047 | 0.085✓ | 1.00 | 0.130 | (vy 0.154 FAIL) | REVERT (fixed sym but broke vy) |
+| run08 | pose -0.5→-1.0 | … | … | … | … | … | training |
+
 **Current best = run05.** Next after run07: feet_phase tracking_sigma, or accept ceiling.
