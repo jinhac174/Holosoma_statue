@@ -40,4 +40,7 @@ Self-driven train → full-eval → diagnose → next-lever loop. Runs until the
 Trend: feet_phase swing height ↓scuff, ↑clearance, ↓symmetry — but ↑vyaw-RMS (0.12→0.18,
 near 0.20 cap). Swing height near its useful limit. Next: feet_phase **weight** (5→8) or
 **tracking_sigma** (0.008→0.005) to tighten swing without raising height further. torque
-remains blocked (no term). **Current best = run05.**
+remains blocked (no term). | run06 | feet_phase weight 5→8 | 0.044 | 0.106 | 1.00 | 0.137 | 0.158 | REVERT (vy 0.154>spec, CoT 2.13) |
+| run07 | pose weight -0.5→-1.5 (target symmetry) | … | … | … | … | … | training |
+
+**Current best = run05.** Next after run07: feet_phase tracking_sigma, or accept ceiling.
