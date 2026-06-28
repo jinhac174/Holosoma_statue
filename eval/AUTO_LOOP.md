@@ -30,6 +30,14 @@ Self-driven train → full-eval → diagnose → next-lever loop. Runs until the
 (adaptive after that, based on results)
 
 ## Iteration log
-| run | change (from best) | scuff | symmetry | torque | tracking vx | keep? |
-|-----|--------------------|-------|----------|--------|-------------|-------|
-| run04 (best) | feet_phase 0.12 | 0.056 | 0.127 | 1.00 | 0.101 | baseline |
+| run | change (from best) | scuff | symmetry | torque | trk vx | trk vyaw | keep? |
+|-----|--------------------|-------|----------|--------|--------|----------|-------|
+| run02 | bridge fix (baseline) | 0.069 | 0.114 | 1.00 | 0.115 | 0.120 | baseline |
+| run03 | action_rate -2→-4 | 0.072 | 0.085* | 1.00 | 0.139 | 0.118 | REVERT (curves worse; sym=conservatism) |
+| run04 | feet_phase swing 0.12 | 0.056 | 0.127 | 1.00 | 0.101 | 0.137 | KEEP (scuff↓, clearance↑) |
+| run05 | feet_phase swing 0.15 | 0.049 | 0.109 | 1.00 | 0.101 | 0.179 | KEEP (scuff↓, sym↓; vyaw margin thin) |
+
+Trend: feet_phase swing height ↓scuff, ↑clearance, ↓symmetry — but ↑vyaw-RMS (0.12→0.18,
+near 0.20 cap). Swing height near its useful limit. Next: feet_phase **weight** (5→8) or
+**tracking_sigma** (0.008→0.005) to tighten swing without raising height further. torque
+remains blocked (no term). **Current best = run05.**
