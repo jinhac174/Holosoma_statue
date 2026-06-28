@@ -46,4 +46,13 @@ remains blocked (no term). | run06 | feet_phase weight 5→8 | 0.044 | 0.106 | 1
 | run07 | pose -0.5→-1.5 | 0.047 | 0.085✓ | 1.00 | 0.130 | (vy 0.154 FAIL) | REVERT (fixed sym but broke vy) |
 | run08 | pose -0.5→-1.0 | … | … | … | … | … | training |
 
+| run08 | pose -0.5→-1.0 | 0.049 | 0.139 | 1.00 | 0.131 | 0.136 | REVERT (symmetry noise, no gain) |
+
+## CONCLUSION (auto-loop paused after run08)
+Existing weight/param knobs are EXHAUSTED — Pareto frontier mapped over runs 03-08:
+- scuff plateaus ~0.047 (feet_phase = height, not the toe-off drag) -> needs penalty_stumble (exists, disabled)
+- symmetry noise-dominated ~0.09-0.14 (pose non-monotonic) -> needs a symmetry term or accept marginal
+- torque blocked (no knob) -> needs torque term or ankle-kp
+No existing-knob combo passes all simultaneously. **Best policy = run05** (all tracking in spec; fails scuff/symmetry/torque). Awaiting user for the term decision.
+
 **Current best = run05.** Next after run07: feet_phase tracking_sigma, or accept ceiling.

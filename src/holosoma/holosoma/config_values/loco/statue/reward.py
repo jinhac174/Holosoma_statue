@@ -133,7 +133,7 @@ statue_28dof_loco_fast_sac = RewardManagerCfg(
         ),
         "pose": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:pose",
-            weight=-1.0,
+            weight=-0.5,
             params={
                 "pose_weights": [
                     0.01,
