@@ -5,7 +5,8 @@
 # (sourcing hsgym after hsmujoco in the same shell does NOT switch — that was a bug).
 # Usage: full_eval.sh <run_dir> <onnx> <pt> [gpu=4] [n_per_cmd=100]
 set -e
-RUN_DIR="$1"; ONNX="$2"; PT="$3"; GPU="${4:-4}"; N="${5:-100}"
+# GPU is ALWAYS 6 (our only allocated device). Do not change — other GPUs belong to other users.
+RUN_DIR="$1"; ONNX="$2"; PT="$3"; GPU=6; N="${5:-100}"
 cd /home/jinhac174/repos/holosoma
 MJ='source scripts/source_mujoco_setup.sh >/dev/null 2>&1 &&'
 IG='source scripts/source_isaacgym_setup.sh >/dev/null 2>&1 &&'

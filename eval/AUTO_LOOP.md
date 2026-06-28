@@ -3,6 +3,7 @@
 Self-driven train → full-eval → diagnose → next-lever loop. Runs until the user returns.
 
 ## Rules
+- **GPU 6 ONLY** — never use any other GPU for training or eval (shared box; other GPUs are other users).
 - **No new reward terms** (only weights/params of already-enabled terms, DR, algo flags).
 - **One change per run**, logged below (and in CHANGELOG.md).
 - **Keep/revert**: keep a change if a *failing* target metric improves AND no *passing*
