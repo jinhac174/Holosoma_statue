@@ -128,3 +128,10 @@ ankle-peak spikes. Tracking fine (vx .113/vy .128/yaw .176), symmetry 0.102, scu
 
 ## run11_torque1 — 2026-06-29 (training)
 **Changed:** penalty_torque weight −0.5 → −1.0 (torque unmoved at −0.5; tracking had room).
+
+## run11_torque1 — 2026-06-29 (KEEP: torque dist improving)
+penalty_torque -0.5 -> -1.0. min safety still 1.00 (worst-case DR outliers) BUT distribution
+clearly up: %rollouts torque-safe 22%->38%, mean 1.29->1.32. Tracking held (vx .111/vy .136/
+yaw .165), scuff 0, symmetry 0.153 (noise). The penalty works; worst-case ankle spike on
+hardest DR persists. Also fixed GPU-2 graphics leak (--logger.video.enabled False -> graphics_device_id=-1).
+**→ run12:** penalty_torque -1.0 -> -2.0 (push distribution further).
