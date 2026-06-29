@@ -119,3 +119,12 @@ reward terms (existing knobs exhausted).
 **Result:** <which thresholds moved>.
 **→ Next:** ...
 -->
+
+## run10_torque — 2026-06-29
+**Changed:** added `penalty_torque` = Σ(τ/stall)² (weight −0.5), targeting torque margin.
+**Result (MuJoCo 30/cmd):** torque safety **1.00 unchanged** — −0.5 too weak to remove the
+ankle-peak spikes. Tracking fine (vx .113/vy .128/yaw .176), symmetry 0.102, scuff 0.0, fall 0%.
+**→ run11:** increase penalty_torque −0.5 → −1.0.
+
+## run11_torque1 — 2026-06-29 (training)
+**Changed:** penalty_torque weight −0.5 → −1.0 (torque unmoved at −0.5; tracking had room).
