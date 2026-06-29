@@ -135,3 +135,13 @@ clearly up: %rollouts torque-safe 22%->38%, mean 1.29->1.32. Tracking held (vx .
 yaw .165), scuff 0, symmetry 0.153 (noise). The penalty works; worst-case ankle spike on
 hardest DR persists. Also fixed GPU-2 graphics leak (--logger.video.enabled False -> graphics_device_id=-1).
 **→ run12:** penalty_torque -1.0 -> -2.0 (push distribution further).
+
+## run12_torque2 — 2026-06-30 (REVERT: penalty plateaued)
+penalty_torque -1.0 -> -2.0. Torque %pass 38%->40% (mean 1.32->1.34) — marginal; min still 1.00.
+Tracking vx degraded 0.111->0.135. Diminishing returns + tracking cost -> revert to run11 (-1.0).
+CONCLUSION (torque): penalty_torque improves the torque distribution (11%->38% rollouts safe,
+mean 1.13->1.32) but cannot reach the strict spec min>1.25 "at all times" — the 60 Nm ankle_roll
+saturates on worst-case DR rollouts regardless. Best torque setting = run11 (-1.0).
+NEXT (user decision): (a) lower ankle_roll kp to cap torque capacity (risks balance), or
+(b) accept distribution result + document worst-case as hardware-ankle-limited.
+**New best policy = run11** (torque dist 38% vs run05 11%; tracking holds; sym noise).
