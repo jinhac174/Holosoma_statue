@@ -180,6 +180,12 @@ statue_28dof_loco_fast_sac = RewardManagerCfg(
             params={},
             tags=["penalty_curriculum"],
         ),
+        "penalty_stumble": RewardTermCfg(
+            func="holosoma.managers.reward.terms.locomotion:penalty_stumble",
+            weight=-2.0,
+            params={},
+            tags=["penalty_curriculum"],
+        ),
         "alive": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:alive",
             weight=10.0,
