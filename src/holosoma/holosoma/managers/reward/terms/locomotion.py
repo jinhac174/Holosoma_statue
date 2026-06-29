@@ -62,6 +62,25 @@ def termination(env: LeggedRobotLocomotionManager) -> torch.Tensor:
 # ================================================================================================
 
 
+def penalty_torque(env) -> torch.Tensor:
+    """Penalize normalized squared joint torque: sum_j (tau_j / stall_j)^2.
+
+    Normalizing by each joint's stall (effort) limit makes small-limit joints (e.g.
+    ankle_roll, 60 Nm) the dominant penalized term, so the policy is pushed to keep
+    peak torque under the limit -> raises the torque safety factor (stall/peak).
+    Returns [num_envs].
+    """
+    torques = None
+    for _name, term in env.action_manager.iter_terms():
+        if hasattr(term, "torques"):
+            torques = term.torques
+            break
+    if torques is None:
+        return torch.zeros(env.num_envs, device=env.device)
+    limits = env.torque_limits  # [num_dof]
+    return torch.sum(torch.square(torques / limits), dim=1)
+
+
 def penalty_action_rate(env: LeggedRobotLocomotionManager) -> torch.Tensor:
     """Penalize changes in actions between steps.
 
