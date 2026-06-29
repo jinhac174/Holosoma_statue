@@ -234,21 +234,32 @@ def foot_clearance(r: RolloutData) -> tuple[float, float]:
     return float(np.mean(peaks)), float(np.min(peaks))
 
 
-def foot_scuffing(r: RolloutData, scuff_h: float = 0.03, scuff_speed: float = 0.2) -> float:
-    """Fraction of timesteps a foot is *dragging*: moving horizontally faster than
-    ``scuff_speed`` (m/s) while its height is below ``scuff_h`` (m).
+def foot_scuffing(r: RolloutData, scuff_h: float = 0.03, scuff_speed: float = 0.2,
+                  min_run_s: float = 0.1) -> float:
+    """Fraction of timesteps a foot is *sustainedly dragging*: moving horizontally faster
+    than ``scuff_speed`` (m/s) while below ``scuff_h`` (m), for a contiguous run of at
+    least ``min_run_s`` seconds.
 
-    This is the direct "no foot-scuffing during swing" detector — unlike swing-apex,
-    it catches a foot that clips/drags the ground at toe-off or touchdown. 0 = clean.
+    The ``min_run_s`` filter is essential: every gait briefly passes through "low + moving"
+    at toe-off/touchdown (~40-60 ms) — those are NOT scuffing. Real swing-phase scuffing is
+    the foot dragging for a sustained period. Filtering short runs removes that artifact.
     """
     fp = _foot_pos(r)
     if fp is None:
         return float("nan")
     h, xy = fp
     horiz_speed = np.linalg.norm(np.diff(xy, axis=0), axis=-1) / r.dt  # [T-1, 2]
-    low = h[1:] < scuff_h
-    drag = low & (horiz_speed > scuff_speed)
-    return float(drag.mean())
+    low_moving = (h[1:] < scuff_h) & (horiz_speed > scuff_speed)
+    min_run = max(1, int(round(min_run_s / r.dt)))
+    sustained = np.zeros_like(low_moving)
+    for foot in range(low_moving.shape[1]):
+        idx = np.flatnonzero(low_moving[:, foot])
+        if idx.size == 0:
+            continue
+        for run in np.split(idx, np.flatnonzero(np.diff(idx) > 1) + 1):
+            if run.size >= min_run:
+                sustained[run, foot] = True
+    return float(sustained.mean())
 
 
 def torque_safety(r: RolloutData) -> tuple[float, str, int]:
