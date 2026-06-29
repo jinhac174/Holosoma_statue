@@ -182,7 +182,7 @@ statue_28dof_loco_fast_sac = RewardManagerCfg(
         ),
         "penalty_torque": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:penalty_torque",
-            weight=-0.5,
+            weight=-1.0,
             params={},
             tags=["penalty_curriculum"],
         ),
