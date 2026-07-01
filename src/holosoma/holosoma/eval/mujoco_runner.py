@@ -84,8 +84,10 @@ class MujocoEvalInterface:
         self._kd_level = 1.0
         # substep buffers, filled each policy step
         self.substep_tau: list[np.ndarray] = []
+        self.substep_tau_raw: list[np.ndarray] = []  # PRE-clip PD demand (may exceed effort limit)
         self.substep_dqv: list[np.ndarray] = []
         self.last_tau = np.zeros(runner.n_dof, dtype=np.float32)
+        self.last_tau_raw = np.zeros(runner.n_dof, dtype=np.float32)
 
     # ---- methods the policy calls ----
     def get_low_state(self) -> np.ndarray:
@@ -115,17 +117,20 @@ class MujocoEvalInterface:
         cmd_tau = np.asarray(cmd_tau, dtype=np.float32).reshape(-1)
 
         self.substep_tau = []
+        self.substep_tau_raw = []
         self.substep_dqv = []
         for _ in range(r.decimation):
             q = r.data.qpos[r.dof_qpos_addrs]
             dq = r.data.qvel[r.dof_qvel_addrs]
-            tau = kp * (cmd_q - q) + kd * (cmd_dq - dq) + cmd_tau
-            tau = np.clip(tau, -r.effort_limits, r.effort_limits).astype(np.float32)
+            tau_raw = (kp * (cmd_q - q) + kd * (cmd_dq - dq) + cmd_tau).astype(np.float32)
+            tau = np.clip(tau_raw, -r.effort_limits, r.effort_limits).astype(np.float32)
             r.data.ctrl[r.actuator_ids] = tau
             mujoco.mj_step(r.model, r.data)
             self.substep_tau.append(tau.copy())
+            self.substep_tau_raw.append(tau_raw.copy())  # what the PD controller ASKED for, pre-clip
             self.substep_dqv.append(r.data.qvel[r.dof_qvel_addrs].astype(np.float32).copy())
         self.last_tau = tau
+        self.last_tau_raw = tau_raw
 
     def get_joystick_msg(self):
         return None
@@ -351,6 +356,7 @@ class MujocoEvalRunner:
         n_steps = int(round(rc.duration_s / self.dt))
         buffers: dict[str, list] = {k: [] for k in (
             "dof_pos_target", "dof_pos", "dof_vel", "torques", "torques_substep", "dof_vel_substep",
+            "torques_raw", "torques_substep_raw",
             "actions", "root_pos", "root_quat_xyzw", "root_lin_vel", "root_ang_vel",
             "body_pos_w", "body_quat_xyzw", "commanded_velocity", "self_collision",
         )}
@@ -380,6 +386,8 @@ class MujocoEvalRunner:
             buffers["dof_vel"].append(d.qvel[self.dof_qvel_addrs].astype(np.float32).copy())
             buffers["torques"].append(self.interface.last_tau.copy())
             buffers["torques_substep"].append(np.stack(self.interface.substep_tau))
+            buffers["torques_raw"].append(self.interface.last_tau_raw.copy())
+            buffers["torques_substep_raw"].append(np.stack(self.interface.substep_tau_raw))
             buffers["dof_vel_substep"].append(np.stack(self.interface.substep_dqv))
             buffers["actions"].append(self.policy.scaled_policy_action[0].astype(np.float32).copy())
             buffers["dof_pos_target"].append((self.policy.scaled_policy_action[0] + self.default_angles).astype(np.float32))
