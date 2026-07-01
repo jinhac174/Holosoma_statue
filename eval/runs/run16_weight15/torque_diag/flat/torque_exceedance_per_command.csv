@@ -1,0 +1,13 @@
+command,mean_pct_substeps_saturated,n_rollouts
+back03,0.0130,50
+fwd025,0.3397,50
+fwd05,0.4316,50
+fwd08,0.2196,50
+fwd10,0.2273,50
+left03,0.8168,50
+mixed_a,0.7013,50
+mixed_b,0.1323,50
+right03,0.0803,50
+stand,0.0000,50
+yawL05,0.0448,50
+yawR05,0.0808,50
