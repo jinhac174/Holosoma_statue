@@ -101,6 +101,14 @@ statue_28dof_loco_single_wolinvel = ObservationManagerCfg(
                     scale=1.0,
                     noise=0.0,
                 ),
+                # PRIVILEGED critic-only feature: per-joint torque demand (tau/limit).
+                # Sharpens credit assignment for penalty_torque. NOT in actor_obs --
+                # unavailable at deployment; would break the ONNX/inference path.
+                "dof_torque": ObsTermCfg(
+                    func="holosoma.managers.observation.terms.locomotion:dof_torque",
+                    scale=1.0,
+                    noise=0.0,
+                ),
                 "sin_phase": ObsTermCfg(
                     func="holosoma.managers.observation.terms.locomotion:sin_phase",
                     scale=1.0,

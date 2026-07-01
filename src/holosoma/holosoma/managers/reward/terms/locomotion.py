@@ -63,22 +63,44 @@ def termination(env: LeggedRobotLocomotionManager) -> torch.Tensor:
 
 
 def penalty_torque(env) -> torch.Tensor:
-    """Penalize normalized squared joint torque: sum_j (tau_j / stall_j)^2.
+    """One-sided hinge penalty on torque ABOVE the safe band (0.8 * effort limit).
 
-    Normalizing by each joint's stall (effort) limit makes small-limit joints (e.g.
-    ankle_roll, 60 Nm) the dominant penalized term, so the policy is pushed to keep
-    peak torque under the limit -> raises the torque safety factor (stall/peak).
-    Returns [num_envs].
+    Spec hardware-safety target: peak torque <= 0.8 * stall (safety factor > 1.25).
+
+    The previous version penalized sum_j (tau_j / limit_j)^2 over ALL torque. That is
+    misleading: it penalizes useful torque well inside the envelope just as hard
+    (relative to its magnitude) as dangerous torque, pushing the policy toward a
+    globally low-torque, sluggish gait instead of toward the actual constraint. Here
+    we penalize ONLY the excess over 0.8*limit, growing quadratically the further it
+    exceeds -- a soft step / hinge:
+
+        penalty_j = ( relu(|tau_j| - 0.8 * limit_j) / limit_j )^2
+
+    Below 0.8*limit -> exactly 0 (normal-effort motion is free; no lazy-gait bias).
+    Above it       -> grows with overshoot, harder the more it exceeds, and because
+                      it is normalized by limit_j the small-limit ankle_roll (the
+                      binding joint) dominates whenever it over-commands.
+
+    Critically it reads the PRE-CLIP demand (`torques_raw`): the applied torque is
+    clipped to +/- torque_limits, so a hinge on it would be flat (zero gradient) past
+    saturation -- exactly where we most need to push back. Penalizing the *demand*
+    keeps a live gradient: 1.5*limit is penalized harder than 1.0*limit, teaching the
+    policy to operate within the actuator envelope. Falls back to applied torque if
+    raw demand is unavailable. Returns [num_envs].
     """
-    torques = None
-    for _name, term in env.action_manager.iter_terms():
-        if hasattr(term, "torques"):
-            torques = term.torques
+    term = None
+    for _name, t in env.action_manager.iter_terms():
+        if hasattr(t, "torques"):
+            term = t
             break
-    if torques is None:
+    if term is None:
         return torch.zeros(env.num_envs, device=env.device)
-    limits = env.torque_limits  # [num_dof]
-    return torch.sum(torch.square(torques / limits), dim=1)
+    torques = getattr(term, "torques_raw", None)
+    if torques is None:
+        torques = term.torques
+    limits = env.torque_limits  # [num_dof], per-joint stall/effort limit
+    excess = torch.clamp(torques.abs() - 0.8 * limits, min=0.0)
+    return torch.sum(torch.square(excess / limits), dim=1)
 
 
 def penalty_action_rate(env: LeggedRobotLocomotionManager) -> torch.Tensor:

@@ -507,6 +507,16 @@ class SymmetryUtils:
         """
         return dof_vel[..., self.joint_index_map] * self.sign_flip_mask
 
+    def mirror_obs_dof_torque(self, dof_torque: torch.Tensor) -> torch.Tensor:
+        """Mirrors per-joint torque (tau/limit), same transform as dof_pos/dof_vel.
+
+        Torque is a per-joint quantity, so under a left-right mirror it follows the
+        identical joint remap + sign flip as joint positions/velocities. (Used for the
+        critic-only dof_torque observation; needed because use_symmetry mirrors every
+        obs term.)
+        """
+        return dof_torque[..., self.joint_index_map] * self.sign_flip_mask
+
     def mirror_obs_actions(self, actions: torch.Tensor) -> torch.Tensor:
         """Mirrors the previous actions (same mapping as joint positions).
 

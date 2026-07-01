@@ -48,21 +48,33 @@ DEFAULT_COMMANDS: list[tuple[float, float, float, str]] = [
     (0.8, -0.2, -0.3, "mixed_b"),
 ]
 
-# Training DR ranges (from config_values/loco/statue/randomization.py)
+# Training DR ranges (from config_values/loco/statue/randomization.py). "hard" matches
+# the IsaacGym eval so the sim2sim gap is fair (hard-vs-hard). Excludes push (the IG eval
+# also disables push via is_evaluating) and torque-RFI (disabled in training).
 DR_FRICTION = (0.5, 1.25)
 DR_ADDED_MASS = (-1.0, 3.0)
 DR_LINK_MASS = (0.9, 1.2)
-DR_INIT_JOINT_NOISE = 0.05  # rad
+DR_INIT_JOINT_NOISE = 0.05     # rad
+DR_KP = (0.9, 1.1)             # PD stiffness scale
+DR_KD = (0.9, 1.1)             # PD damping scale
+DR_COM = 0.05                  # m, base-COM +-range each axis
+OBS_NOISE_DOF_POS = 0.01       # rad  (actor_obs dof_pos noise)
+OBS_NOISE_DOF_VEL = 0.1        # rad/s (actor_obs dof_vel noise)
 
 
 def sample_dr(rng: np.random.Generator, enable: bool) -> DRParams:
     if not enable:
-        return DRParams(friction=1.0)
+        return DRParams(friction=1.0)   # nominal: no DR, no obs noise
     return DRParams(
         friction=float(rng.uniform(*DR_FRICTION)),
         added_base_mass=float(rng.uniform(*DR_ADDED_MASS)),
         link_mass_scale=float(rng.uniform(*DR_LINK_MASS)),
         init_joint_noise=DR_INIT_JOINT_NOISE,
+        kp_scale=float(rng.uniform(*DR_KP)),
+        kd_scale=float(rng.uniform(*DR_KD)),
+        base_com_offset=tuple(float(rng.uniform(-DR_COM, DR_COM)) for _ in range(3)),
+        obs_noise_dof_pos=OBS_NOISE_DOF_POS,
+        obs_noise_dof_vel=OBS_NOISE_DOF_VEL,
     )
 
 

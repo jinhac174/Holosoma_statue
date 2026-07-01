@@ -1,0 +1,47 @@
+==================================================================
+  EVAL SCORECARD — run10_torque
+  generated 2026-06-30
+==================================================================
+  MuJoCo rollouts: 1200 | IsaacGym rollouts: 1200
+
+SPEC COMPLIANCE  (MuJoCo sim2sim — the deployment-facing numbers)
+  [PASS] tracking RMS vx (m/s)                  0.113   (target <= 0.15)
+  [PASS] tracking RMS vy (m/s)                  0.128   (target <= 0.15)
+  [PASS] tracking RMS vyaw (rad/s)              0.175   (target <= 0.2)
+  [FAIL] symmetry index                         0.106   (target <= 0.1)
+  [FAIL] min torque safety factor               1.000   (target >= 1.25)
+  [PASS] cost of transport                      1.108   (target <= 2.5)
+  [PASS] min foot clearance (m)                 0.071   (target > 0.0)
+  [PASS] foot scuff fraction                    0.000   (target <= 0.02)
+  [PASS] joint pos-limit violations                 0   (target == 0)
+  [INFO] fall rate                               0.0%
+  [INFO] torque-limit violations (step*joint)      1187
+
+PER-COMMAND  (MuJoCo)
+                            fall  rms_vx  rms_vy    sym     sf
+  cmd                                                         
+  vx+0.00 vy+0.00 yaw+0.00   0.0   0.006   0.003  0.241  2.986
+  vx+0.00 vy+0.00 yaw+0.50   0.0   0.050   0.119  0.033  1.119
+  vx+0.00 vy+0.00 yaw-0.50   0.0   0.057   0.123  0.029  1.048
+  vx+0.00 vy+0.30 yaw+0.00   0.0   0.046   0.167  0.180  1.003
+  vx+0.00 vy-0.30 yaw+0.00   0.0   0.058   0.168  0.118  1.162
+  vx+0.25 vy+0.00 yaw+0.00   0.0   0.088   0.118  0.059  1.168
+  vx+0.50 vy+0.00 yaw+0.00   0.0   0.131   0.123  0.064  1.236
+  vx+0.50 vy+0.20 yaw+0.30   0.0   0.142   0.144  0.111  1.113
+  vx+0.80 vy+0.00 yaw+0.00   0.0   0.210   0.143  0.058  1.311
+  vx+0.80 vy-0.20 yaw-0.30   0.0   0.213   0.155  0.228  1.071
+  vx+1.00 vy+0.00 yaw+0.00   0.0   0.289   0.157  0.060  1.161
+  vx-0.30 vy+0.00 yaw+0.00   0.0   0.061   0.112  0.094  1.004
+
+SIM2SIM GAP  (IsaacGym -> MuJoCo, tracking-RMS degradation; spec < 30%)
+  [PASS] rms_vx      IG=0.121  MJ=0.113  gap=-7%
+  [PASS] rms_vy      IG=0.141  MJ=0.128  gap=-9%
+  [PASS] rms_vyaw    IG=0.180  MJ=0.175  gap=-3%
+  fall rate: IsaacGym 2.2%  vs  MuJoCo 0.0%
+==================================================================
+
+ROBUSTNESS BATTERY  (spec §1)
+  [PASS] external push 100N/0.2s — survive      fall 0.0%
+  [FAIL] rough terrain — walk                   fall 6.3%, tracking RMS vx 0.131
+  [PASS] no self-collision (flat eval)          0 steps
+==================================================================

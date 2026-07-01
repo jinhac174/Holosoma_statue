@@ -145,3 +145,106 @@ saturates on worst-case DR rollouts regardless. Best torque setting = run11 (-1.
 NEXT (user decision): (a) lower ankle_roll kp to cap torque capacity (risks balance), or
 (b) accept distribution result + document worst-case as hardware-ankle-limited.
 **New best policy = run11** (torque dist 38% vs run05 11%; tracking holds; sym noise).
+
+## run13_torquehinge — 2026-06-30 (REDESIGNED penalty_torque — training)
+**Why:** runs 10-12 proved the OLD penalty (sum (tau/limit)^2 over ALL torque) is the wrong
+shape — it penalizes useful in-envelope torque, biases toward a lazy gait, and (because applied
+torque is CLIPPED at the limit) has ~zero gradient exactly at saturation, so it plateaued.
+**Change (2 edits, user-directed):**
+  1. joint_control.py now caches the PRE-CLIP PD torque demand as `torques_raw`.
+  2. penalty_torque is now a one-sided HINGE on the demand:
+       sum_j ( relu(|tau_j| - 0.8*limit_j) / limit_j )^2
+     = 0 below 0.8*limit, quadratic above, harder the more it exceeds, with LIVE gradient
+     past saturation (1.5*limit penalized harder than 1.0*limit). Directly targets the
+     safety-factor spec (peak <= 0.8*stall) instead of generic torque minimization.
+  3. weight -1.0 -> -25.0 (hinge magnitude is ~50-100x smaller; -25 makes a saturating ankle
+     cost ~ -1 reward vs alive +10 / tracking +2). First point of a new weight sweep.
+**Hypothesis:** worst-case min torque safety factor rises above 1.00 (ideally toward 1.25)
+WITHOUT the run12-style tracking degradation, because in-band torque is no longer penalized.
+**Result (full battery, MuJoCo 1200 + IG 1200 + push + rough):** MIXED — the hinge SHAPE is
+validated, but weight -25 has side effects.
+  WINS: tracking improved on every axis (vx .110->.107, vy .135->.121, vyaw .165->.116 — and
+        NO run12-style degradation, the hinge preserves tracking); ROUGH now PASSES (5.2%->4.8%);
+        mean torque safety up (1.323->1.369), median up (1.091->1.173) = fewer extreme
+        over-commands. sim2sim gap PASS (vx -16/vy -9/vyaw -27%); push 0%; scuff 0; CoT 1.35.
+  LOSSES: SYMMETRY clearly WORSE, incl. forward-walk (0.046->0.170, n=300) — not the low-energy
+        artifact this time; weight -25 induced a genuinely asymmetric gait (policy likely favors
+        one leg to hold ankle torque down). Torque %rollouts strictly-safe(>=1.25) DOWN 39%->31%,
+        and worst-case min STILL 1.000 (ankle_roll clips on hardest DR — hardware-bound, same as
+        run11/12 regardless of penalty).
+**Read:** the redesigned hinge is the right TOOL (tracking preserved/improved, mean margin up,
+unlike the old clipped-squared term), but -25 is TOO AGGRESSIVE — it bought central-tendency
+torque margin at the cost of symmetry without raising the strict-safe fraction. Best BALANCED
+policy stays run11 until a lower hinge weight keeps run11's symmetry+strict-torque AND run13's
+tracking/rough.
+**-> run14:** lower hinge weight (-25 -> ~-10), ADD logger:wandb + video (with GPU-6 startup
+guard). Goal: keep mean-margin/tracking/rough gains, recover symmetry. Torque strict-min is now
+confirmed hardware-limited across 11/12/13 -> separate decision: ankle_roll kp down, or accept +
+document. (run14b option, user-raised: add dof_torque=tau/limit from torques_raw to critic_obs
+only — privileged critic feature, zero deployment impact, to sharpen credit assignment.)
+
+## run14_critic_lower — 2026-06-30 (hinge -10 + dof_torque in critic_obs + W&B)
+**Changed (2 levers at once):** penalty_torque hinge weight -25 -> -10; added dof_torque
+(tau/limit, pre-clip) to critic_obs ONLY (+ mirror_obs_dof_torque for use_symmetry). W&B
+scalars on (video OFF — it leaked graphics onto another GPU). W&B run ddvtz2p3.
+**Result (full battery):** SYMMETRY RECOVERED, TORQUE COLLAPSED — a clean Pareto move.
+  vs run13: symmetry agg 0.235->0.132, fwd-walk 0.170->0.076 (PASSES <0.10!); tracking best
+  yet (vx .102/vy .114/vyaw .134); CoT 0.698 (very efficient); rough 3.8% (PASS); push 0%.
+  BUT torque distribution COLLAPSED: %rollouts safe(>=1.25) 31%->8.5%, mean 1.369->1.152,
+  median 1.173->1.000 (half the rollouts now saturate a joint). Per-command sf ~1.00 on
+  almost every command. min still 1.000.
+**Read:** penalty_torque weight is a direct TORQUE<->SYMMETRY/tracking knob. -25 = good torque
+mean, broken symmetry. -10 = recovered symmetry + best tracking/CoT, but torque careless.
+The sweet spot is between (~-15..-18). The critic-torque effect is CONFOUNDED with the weight
+drop (both moved); torque got worse not better, so the critic did NOT rescue torque here — its
+benefit (if any) can't be isolated from this run. Symmetry strict spec still failed (0.132) but
+fwd-walk passes; torque strict-min STILL 1.000 across run11/12/13/14 = definitively
+HARDWARE-BOUND (no penalty weight reaches it).
+**-> run15:** weight ~-15 (Pareto knee: claw back torque distribution while keeping run14's
+symmetry/tracking/rough). Keep dof_torque in critic (free, may help at the knee). Torque
+strict-min: accept + document as hardware-limited (ankle_roll undersized) unless we try
+ankle_roll kp. Best-balanced so far = run14 (fails only torque-dist + marginal symmetry;
+tracking/CoT/rough/push/scuff/sim2sim all pass) — pending the run15 knee.
+
+## run15_ankle_actionscale — 2026-07-01 (REVERTED — negative result, but decisive)
+**Changed (physical torque cap, on top of run14):** ankle_roll kp 70->50 + action_scale
+0.25->0.20. Hypothesis: cap ankle torque by construction -> raise safety factor.
+**Result:** BACKFIRED on tracking, did NOT fix torque.
+  torque: min STILL 1.000, %safe 8.5%->11.7% (≈flat), median still 1.000; ankle_roll still the
+    saturating joint in 1086/1200 rollouts.
+  tracking: ALL axes now FAIL (vx .102->.171, vy .114->.164, vyaw .134->.251); vx@1.0 RMS 0.436
+    (can't reach top speed with reduced authority). pos-limit violations 0->68. rough 3.8%->8.3%
+    (FAIL). sim2sim vyaw gap +50% (FAIL). fall ~0.1%.
+**Mechanism (the real lesson):** ankle_roll saturation is BALANCE-driven, not authority-driven.
+Lower kp produces less torque per unit error, but the robot still NEEDS max ankle torque to stay
+upright under worst-case DR, so it drives the ankle to the clip anyway — just with larger position
+error -> worse tracking + joints pushed past limits, for ZERO torque benefit. You cannot cap
+worst-case ankle torque via kp without falling.
+**CONCLUSION (torque, now THREE independent failures):** reward shaping (run10-13), penalty
+weight (run14), and physical kp/action-scale cap (run15) ALL leave min=1.000 with ankle_roll
+saturating. The strict spec "min torque safety > 1.25 at all times" is DEFINITIVELY hardware-bound:
+the 60 Nm ankle_roll is undersized for worst-case lateral/balance loads on this robot. Accept +
+document; optimize the DISTRIBUTION instead (best = run11, 39% safe). Reverted kp + action_scale.
+**Best policy = run14** (only torque-dist + marginal symmetry 0.132 fail; everything else passes).
+**-> run16:** return to the torque<->symmetry knee (penalty weight ~-15, run14 base) as the last
+reward-side lever; otherwise lock run14 as final and write up torque as hardware-limited.
+
+## run16_weight15 — 2026-07-01 (KEEP — NEW BEST, the knee)
+**Changed:** penalty_torque hinge weight -10 -> -15 (only change from run14; hinge + dof_torque
+in critic retained). W&B run xea391fx.
+**Result (full battery):** best-balanced policy of the campaign -- it hit the knee.
+  torque: %rollouts safe>=1.25 = 43.8% (BEST, beats run11's 39.3%), mean 1.271, median 1.190;
+    forward-walk sf strong again (vx0.5 1.40 / vx0.8 1.44 / vx1.0 1.50). min still 1.000 (ankle
+    hardware-bound, as always).
+  symmetry: agg 0.118 (BEST aggregate, closest to 0.10), fwd-walk 0.051 (PASSES, ~run11's 0.046).
+  tracking: vx 0.110 / vy 0.135 / vyaw 0.142 (all PASS). CoT 1.226. clearance 0.114 (best). scuff
+    0. pos-limit 0. fall 0%. sim2sim gap -11/-1/-21% (PASS). push 0%.
+  ONLY regressions: rough 3.8%->5.3% (marginal FAIL, heavier torque penalty slightly stiffens the
+    gait); symmetry agg still >0.10 (but best yet + fwd passes).
+**Read:** -15 recovers run11-level torque distribution (actually better, 43.8%) AND run14-level
+symmetry simultaneously -- the torque<->symmetry knee we were looking for. Passes every spec item
+except the three known ones: torque strict-min (hardware-bound), aggregate symmetry (marginal,
+low-energy-command artifact; fwd passes), rough (5.3%, marginal).
+**NEW BEST = run16.** Remaining: rough is a hair over 5% (run14 had it at 3.8% -- run-to-run
+variance / torque-penalty stiffness); decide whether to nudge it or accept. Torque min + aggregate
+symmetry are the documented hardware/metric limits.

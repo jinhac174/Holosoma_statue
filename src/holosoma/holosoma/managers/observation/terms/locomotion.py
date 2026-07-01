@@ -119,6 +119,29 @@ def actions(env: LeggedRobotLocomotionManager) -> torch.Tensor:
     return env.action_manager.action
 
 
+def dof_torque(env: LeggedRobotLocomotionManager) -> torch.Tensor:
+    """Per-joint normalized torque DEMAND (tau / torque_limit), pre-clip.
+
+    Privileged signal for the CRITIC only (never put this in actor_obs -- it is not
+    available at deployment and would break the ONNX/inference path). It hands the
+    value function the exact feature the penalty_torque reward is shaped on, so the
+    critic can attribute the torque penalty to (state, action) directly instead of
+    re-deriving the PD map. Uses pre-clip `torques_raw` so it carries information past
+    actuator saturation (matching the reward term). Falls back to applied torque, or
+    zeros before the first action.
+
+    Returns:
+        Tensor of shape [num_envs, num_dof]
+    """
+    for _name, term in env.action_manager.iter_terms():
+        if hasattr(term, "torques"):
+            torques = getattr(term, "torques_raw", None)
+            if torques is None:
+                torques = term.torques
+            return torques / env.torque_limits
+    return torch.zeros(env.num_envs, env.torque_limits.shape[0], device=env.device)
+
+
 def command_lin_vel(env: LeggedRobotLocomotionManager) -> torch.Tensor:
     """Commanded linear velocity (x, y).
 

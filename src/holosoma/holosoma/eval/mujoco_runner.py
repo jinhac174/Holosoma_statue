@@ -32,12 +32,23 @@ from holosoma.simulator.mujoco.tensor_views import quat_mujoco_to_holosoma
 
 @dataclass
 class DRParams:
-    """Per-rollout domain randomization (sampled by the suite)."""
+    """Per-rollout domain randomization (sampled by the suite).
+
+    Matches the training randomization (config_values/loco/statue/randomization.py):
+    friction, base+link mass, base-COM, PD-gain, and the actor observation noise. The
+    obs-noise fields make a MuJoCo eval 'hard' (matched to IsaacGym's eval) so the
+    sim2sim gap is a fair hard-vs-hard comparison, not easy-vs-hard.
+    """
 
     friction: float = 1.0                 # ground sliding friction
-    added_base_mass: float = 0.0          # kg added to pelvis
+    added_base_mass: float = 0.0          # kg added to pelvis (base) body
     link_mass_scale: float = 1.0          # scale on all link masses
     init_joint_noise: float = 0.0         # rad, uniform per-joint at reset
+    kp_scale: float = 1.0                 # PD stiffness scale (train: [0.9, 1.1])
+    kd_scale: float = 1.0                 # PD damping scale   (train: [0.9, 1.1])
+    base_com_offset: tuple = (0.0, 0.0, 0.0)  # m, base-COM shift (train: +-0.05 each axis)
+    obs_noise_dof_pos: float = 0.0        # rad, uniform obs noise on dof_pos (train: 0.01)
+    obs_noise_dof_vel: float = 0.0        # rad/s, uniform obs noise on dof_vel (train: 0.1)
 
 
 @dataclass
@@ -82,6 +93,13 @@ class MujocoEvalInterface:
         d = r.data
         q = d.qpos[r.dof_qpos_addrs].astype(np.float32)
         dq = d.qvel[r.dof_qvel_addrs].astype(np.float32)
+        # Observation noise (matched to training actor_obs: uniform in [-a, a], applied to
+        # the RAW value before the policy's own scaling — see observation/manager.py). Only
+        # dof_pos and dof_vel carry noise in the config; gyro/gravity are noise-free.
+        if r._obs_noise_dof_pos > 0.0:
+            q = q + r._obs_rng.uniform(-r._obs_noise_dof_pos, r._obs_noise_dof_pos, size=q.shape).astype(np.float32)
+        if r._obs_noise_dof_vel > 0.0:
+            dq = dq + r._obs_rng.uniform(-r._obs_noise_dof_vel, r._obs_noise_dof_vel, size=dq.shape).astype(np.float32)
         quat_wxyz = d.qpos[r.fj_qpos + 3 : r.fj_qpos + 7].astype(np.float32)
         omega_body = d.qvel[r.fj_qvel + 3 : r.fj_qvel + 6].astype(np.float32)  # already body-frame
         base_pos = d.qpos[r.fj_qpos : r.fj_qpos + 3].astype(np.float32)
@@ -232,6 +250,12 @@ class MujocoEvalRunner:
         self._base_body_mass = m.body_mass.copy()
         self._base_body_inertia = m.body_inertia.copy()
         self._base_geom_friction = m.geom_friction.copy()
+        self._base_body_ipos = m.body_ipos.copy()   # for base-COM randomization
+        # obs-noise state (set per-rollout in _reset; nominal by default so get_low_state
+        # works before the first reset and for nominal evals)
+        self._obs_noise_dof_pos = 0.0
+        self._obs_noise_dof_vel = 0.0
+        self._obs_rng = np.random.default_rng(0)
 
     def _resolve_gains(self) -> tuple[np.ndarray, np.ndarray]:
         stiffness = self.robot_cfg.control.stiffness
@@ -273,9 +297,21 @@ class MujocoEvalRunner:
         m.body_mass[:] = self._base_body_mass * rc.dr.link_mass_scale
         m.body_inertia[:] = self._base_body_inertia * rc.dr.link_mass_scale
         m.body_mass[self.pelvis_body_id] += rc.dr.added_base_mass
+        # base-COM shift (train: base_com_range +-0.05 each axis)
+        m.body_ipos[:] = self._base_body_ipos
+        m.body_ipos[self.pelvis_body_id] = self._base_body_ipos[self.pelvis_body_id] + np.asarray(
+            rc.dr.base_com_offset, dtype=m.body_ipos.dtype
+        )
         # ground friction (geom 'eval_floor' is last geom)
         floor_gid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "eval_floor")
         m.geom_friction[floor_gid, 0] = rc.dr.friction
+        # PD-gain randomization (train: kp/kd_range [0.9, 1.1]) via the interface levels
+        self.interface.kp_level = rc.dr.kp_scale
+        self.interface.kd_level = rc.dr.kd_scale
+        # observation noise (matched to training actor_obs); seeded per rollout
+        self._obs_noise_dof_pos = rc.dr.obs_noise_dof_pos
+        self._obs_noise_dof_vel = rc.dr.obs_noise_dof_vel
+        self._obs_rng = np.random.default_rng(rc.seed + 12345)
 
         mujoco.mj_resetData(m, d)
         d.qpos[self.fj_qpos : self.fj_qpos + 3] = self.robot_cfg.init_state.pos

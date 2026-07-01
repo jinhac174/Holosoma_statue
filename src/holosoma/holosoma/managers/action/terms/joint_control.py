@@ -43,6 +43,10 @@ class JointPositionActionTerm(ActionTermBase):
 
         # Initialize torque buffer
         self.torques = torch.zeros(env.num_envs, self._action_dim, device=env.device)
+        # Pre-clip PD torque *demand* (what the policy asked for, before actuator
+        # saturation / RFI). Reward terms (penalty_torque) read this so the gradient
+        # persists past saturation, where the clipped `self.torques` would be flat.
+        self.torques_raw = torch.zeros(env.num_envs, self._action_dim, device=env.device)
 
         # Sub-step torque history: [num_envs, decimation, num_dof], allocated in setup().
         self._substep_idx: int = 0
@@ -199,6 +203,12 @@ class JointPositionActionTerm(ActionTermBase):
             torques = actions_scaled
         else:
             raise ValueError(f"Unknown controller type: {control_type}")
+
+        # Cache the pure PD torque demand (pre-RFI, pre-clip) for reward shaping:
+        # this is the torque the policy *commanded*, which can exceed the actuator
+        # limit. penalty_torque uses it so over-commanding is penalized with a live
+        # gradient even after the applied torque saturates at +/- torque_limits.
+        self.torques_raw = torques
 
         # Apply torque randomization if configured
         if self._randomize_torque_rfi:

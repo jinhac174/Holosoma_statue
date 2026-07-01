@@ -180,9 +180,15 @@ statue_28dof_loco_fast_sac = RewardManagerCfg(
             params={},
             tags=["penalty_curriculum"],
         ),
+        # penalty_torque: one-sided HINGE on (|tau| - 0.8*limit)^2 (zero in the safe band),
+        # pre-clip demand. Weight is a torque<->symmetry knob: -25 (run13) good torque mean/bad
+        # symmetry; -10 (run14) good symmetry+tracking/weak torque dist. run16: -15, the knee,
+        # to claw back torque distribution while holding run14's symmetry/tracking/rough. (Paired
+        # with dof_torque in critic_obs for credit assignment.) NOTE: strict torque-min is
+        # hardware-bound (ankle_roll 60Nm) -- this only tunes the DISTRIBUTION.
         "penalty_torque": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:penalty_torque",
-            weight=-1.0,
+            weight=-15.0,
             params={},
             tags=["penalty_curriculum"],
         ),

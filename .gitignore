@@ -37,7 +37,8 @@ __pycache__
 .logs/
 holosoma_config.yaml
 wandb-metadata.json
-# eval: track report artifacts (scorecards, csvs, plots, changelog), not raw rollouts
-/eval/runs/**/mujoco/
-/eval/runs/**/isaacgym/
+# eval: track report artifacts (scorecards, csvs, plots, run_info, changelog),
+# NOT raw rollouts. Raw per-rollout NPZ are large (run16 alone ~14GB) and
+# regenerable from the ONNX + run_suite; never commit them.
+/eval/runs/**/*.npz
 /eval/_archive/
