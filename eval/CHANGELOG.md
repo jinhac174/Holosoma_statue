@@ -248,3 +248,29 @@ low-energy-command artifact; fwd passes), rough (5.3%, marginal).
 **NEW BEST = run16.** Remaining: rough is a hair over 5% (run14 had it at 3.8% -- run-to-run
 variance / torque-penalty stiffness); decide whether to nudge it or accept. Torque min + aggregate
 symmetry are the documented hardware/metric limits.
+
+## run17_roll (intermediate, visual-only) — 2026-07-02
+**Changed:** penalty_ang_vel_xy -1.0 -> -3.0 (damp the step-synced lateral roll rocking).
+**Read:** user assessed in MuJoCo — lateral roll "a lot better", but foot clearance too high and
+stance too narrow (feet A-frame inward). Not formally eval'd; superseded by run17_stance_clearance.
+
+## run17_stance_clearance — 2026-07-02 (KEEP — big improvement, symmetry the cost)
+**Changed (stacks the roll fix):** penalty_ang_vel_xy -1->-3; feet_phase swing_height 0.15->0.10
+  (foot clearance); penalty_close_feet_xy threshold 0.15->0.20 (stance width).
+**Result (vs run16):** roll RMS fwd 2.54->1.37 deg (rocking ~halved); foot clearance mean 0.136->0.084m,
+  min 0.104->0.070m; stance width 0.335->0.353m; CoT 1.226->0.573; rough fall 5.3%->2.8% (now PASS);
+  tracking vx 0.110->0.088, vyaw 0.142->0.111; ankle_roll torque IMPROVED (left peak 1.67->1.42x,
+  saturation 0.25%->0.01%). REGRESSION: symmetry 0.118->0.167 (worse, still FAIL); vy 0.135->0.146;
+  scuff 0.000->0.003 (still PASS). torque min still 1.000 (hardware-bound). push 0%, self-collision 0.
+**Read:** all three visual targets (roll, clearance, stance) improved + CoT/rough/tracking/torque bonus.
+  Symmetry is the price (both aggregate and fwd-walk ~doubled). Widening stance did NOT load ankle_roll
+  as feared — it helped. KEEP as new base.
+
+## run18_feetslip — 2026-07-02 (launched, GPU6 video-off)
+**Changed (from run17_stance_clearance):** + penalty_feet_slip (NEW term) weight -2.0 — penalize
+  sum of contact-foot xy-speed^2 (foot must not slide while planted).
+**Hypothesis:** fixes the MuJoCo standing outward-slip limit cycle (feet slide out, near-fall, recover,
+  repeat). Root cause: penalty_torque makes holding hip_roll adductors expensive, so a splayed low-torque
+  stance is "free" and there's no slip term to oppose the drift. This term is orthogonal to the torque
+  budget. **Watch:** standing foot drift (should stop), symmetry (already regressed — hopefully not worse),
+  tracking, and that stance-foot micro-motion during normal gait isn't over-penalized (would stiffen gait).

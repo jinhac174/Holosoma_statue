@@ -42,3 +42,7 @@ wandb-metadata.json
 # regenerable from the ONNX + run_suite; never commit them.
 /eval/runs/**/*.npz
 /eval/_archive/
+
+# raw video renders (isaacsim eval etc.)
+*.mp4
+/eval/statue_eval_isaacsim/

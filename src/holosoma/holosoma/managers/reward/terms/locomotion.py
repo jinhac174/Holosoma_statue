@@ -256,6 +256,22 @@ def penalty_close_feet_xy(env, close_feet_threshold: float = 0.05) -> torch.Tens
     return (feet_distance < close_feet_threshold).float()
 
 
+def penalty_feet_slip(env) -> torch.Tensor:
+    """Penalize horizontal foot velocity while the foot is in contact (feet must not slide).
+
+    For each foot whose normal contact force exceeds a threshold, penalize its squared xy
+    speed. Stops a planted foot from sliding -- both the standing outward-drift limit cycle
+    (the policy relaxes hip_roll adductor torque, so a splayed low-torque stance is "free",
+    and the feet slide out until near-fall then recover) and walking slip. Orthogonal to the
+    torque budget, so it counteracts torque-minimization drift without weakening penalty_torque.
+    Standard legged_gym `feet_slip`. Returns [num_envs].
+    """
+    contact = env.simulator.contact_forces[:, env.feet_indices, 2] > 1.0  # [E, 2]
+    foot_vel_xy = env.simulator._rigid_body_vel[:, env.feet_indices, :2]   # [E, 2, 2]
+    speed_sq = torch.sum(torch.square(foot_vel_xy), dim=2)                 # [E, 2]
+    return torch.sum(speed_sq * contact.float(), dim=1)                    # [E]
+
+
 def base_height(
     env, desired_base_height: float = 0.89, zero_vel_penalty_scale: float = 1.0, stance_penalty_scale: float = 1.0
 ) -> torch.Tensor:

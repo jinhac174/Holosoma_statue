@@ -108,9 +108,12 @@ statue_28dof_loco_fast_sac = RewardManagerCfg(
             weight=1.5,
             params={"tracking_sigma": 0.25},
         ),
+        # -1.0 -> -3.0: damp the step-synced lateral roll rocking (torso tilts toward the
+        # stepping side). This term penalizes base roll/pitch RATE, so raising it targets the
+        # oscillation directly. Watch ankle_roll torque: the sway partly offloads ankle torque.
         "penalty_ang_vel_xy": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:penalty_ang_vel_xy",
-            weight=-1.0,
+            weight=-3.0,
             params={},
             tags=["penalty_curriculum"],
         ),
@@ -129,7 +132,9 @@ statue_28dof_loco_fast_sac = RewardManagerCfg(
         "feet_phase": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:feet_phase",
             weight=5.0,
-            params={"swing_height": 0.15, "tracking_sigma": 0.008},
+            # swing_height 0.15 -> 0.10: foot clearance was too high. Watch scuff (0.15 was
+            # raised from 0.09 to kill scuff) and min-foot-clearance in the eval.
+            params={"swing_height": 0.10, "tracking_sigma": 0.008},
         ),
         "pose": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:pose",
@@ -168,15 +173,29 @@ statue_28dof_loco_fast_sac = RewardManagerCfg(
             },
             tags=["penalty_curriculum"],
         ),
+        # close_feet_threshold 0.15 -> 0.20: stance was too narrow -> legs A-frame inward
+        # ("feet not straight down, slightly in"). Wider min separation makes the legs come
+        # vertical. NOTE: wider stance loads ankle_roll laterally (our binding 60Nm joint) --
+        # watch min torque safety factor in the eval.
         "penalty_close_feet_xy": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:penalty_close_feet_xy",
             weight=-10.0,
-            params={"close_feet_threshold": 0.15},
+            params={"close_feet_threshold": 0.20},
             tags=["penalty_curriculum"],
         ),
         "penalty_feet_ori": RewardTermCfg(
             func="holosoma.managers.reward.terms.locomotion:penalty_feet_ori",
             weight=-5.0,
+            params={},
+            tags=["penalty_curriculum"],
+        ),
+        # NEW (run18): penalize horizontal velocity of a foot while it is in contact. Fixes the
+        # standing outward-slip limit cycle (torque-min relaxes hip_roll adductors -> a splayed
+        # low-torque stance is "free" -> feet slide out until near-fall, then recover, repeat).
+        # Orthogonal to penalty_torque, so it stops the drift without weakening the torque budget.
+        "penalty_feet_slip": RewardTermCfg(
+            func="holosoma.managers.reward.terms.locomotion:penalty_feet_slip",
+            weight=-2.0,
             params={},
             tags=["penalty_curriculum"],
         ),
